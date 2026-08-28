@@ -79,7 +79,7 @@ run_visible() {
 try() {
   local desc="$1"; shift
   info "$desc"
-  if "$@" >>"$LOG" 2>&1; then ok "$desc"; return 0
+  if run_visible "$@"; then ok "$desc"; return 0
   else note_fail "$desc  (detalle en $LOG)"; return 1; fi
 }
 
