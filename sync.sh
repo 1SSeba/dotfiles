@@ -16,4 +16,10 @@ done
 for f in .zshrc .bashrc .bash_profile; do
   [ -f "$HOME/$f" ] && rsync -a "$HOME/$f" "$R/$f"
 done
+# El shim de WebEngine vive fuera de ~/.config
+if [ -d "$HOME/.local/lib/qs-webengine-shim" ]; then
+  mkdir -p "$R/local/lib/qs-webengine-shim"
+  rsync -a --exclude='*.so' "$HOME/.local/lib/qs-webengine-shim/" "$R/local/lib/qs-webengine-shim/"
+fi
+
 echo ":: repo actualizado en $R"

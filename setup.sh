@@ -7,6 +7,7 @@
 #         ./setup.sh --deps       solo paquetes
 #         ./setup.sh --dots       solo la configuración (= install.sh)
 #         ./setup.sh --venv       solo el entorno Python de la shell
+#         ./setup.sh --fonts      solo las fuentes que no vienen en paquetes
 #         ./setup.sh --upstream   clona el fork end4-pC como referencia
 # ============================================================================
 set -euo pipefail
@@ -17,6 +18,8 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPSTREAM="https://github.com/end-4/dots-hyprland.git"
 # Fork del que porto features hacia mi shell ii (solo referencia, no se instala).
 FORK="https://github.com/pctrade/end4-pC.git"
+# Fuente de la UI: no está empaquetada, se clona a mano (igual que hace end-4).
+FONT_REPO="https://github.com/end-4/google-sans-flex"
 WORKDIR="${XDG_CACHE_HOME:-$HOME/.cache}/dots-setup"
 VENV="$HOME/.local/state/quickshell/.venv"
 
@@ -110,6 +113,20 @@ setup_venv() {
     || c_warn "no se pudieron instalar los extras de Python"
 }
 
+# ---------------------------------------------------------------- fuentes
+install_fonts() {
+  local dst="$HOME/.local/share/fonts/illogical-impulse-google-sans-flex"
+  if [ -d "$dst/.git" ]; then
+    c_info "Google Sans Flex ya está; actualizando"
+    git -C "$dst" pull --ff-only || true
+  else
+    c_info "Clonando Google Sans Flex en $dst"
+    mkdir -p "$(dirname "$dst")"
+    git clone --depth 1 "$FONT_REPO" "$dst" || { c_warn "no se pudo clonar la fuente"; return 1; }
+  fi
+  fc-cache -f >/dev/null 2>&1 || true
+}
+
 # ---------------------------------------------------------------- referencia
 clone_upstream_ref() {
   local dst="$HOME/.config/quickshell/end4-pC"
@@ -147,12 +164,14 @@ install_dots() {
 case "${1:-all}" in
   --deps) preflight; install_deps ;;
   --venv) ensure_aur >/dev/null 2>&1 || true; setup_venv ;;
+  --fonts) install_fonts ;;
   --upstream) clone_upstream_ref ;;
   --dots) install_dots ;;
   all|"")
     preflight
     install_deps
     setup_venv
+    install_fonts
     enable_services
     install_dots
     clone_upstream_ref
@@ -161,6 +180,7 @@ case "${1:-all}" in
     echo "   1. Ajusta ~/.config/hypr/monitors.conf a tus pantallas."
     echo "   2. Cierra sesión y entra en Hyprland (o: hyprctl reload && qs -c ii)."
     echo "   3. Si ydotool no responde, reinicia para que aplique el grupo 'input'."
+    echo "   4. Si algo no carga: ./doctor.sh te dice qué falta."
     ;;
   *) c_err "Opción desconocida: $1"; sed -n '2,12p' "$0"; exit 1 ;;
 esac
