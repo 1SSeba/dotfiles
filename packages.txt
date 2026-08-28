@@ -1,46 +1,70 @@
-# Paquetes necesarios (Arch / CachyOS). setup.sh los instala por ti.
-# Agrupados igual que los metapaquetes illogical-impulse-* de end-4.
+# Dependencias (Arch / CachyOS). setup.sh las instala en este mismo orden.
+# 91 vienen de los repos oficiales y 9 del AUR; los metapaquetes se compilan
+# desde el repo de end-4 porque no están publicados en el AUR.
 
-## base
-bc coreutils cliphist cmake curl wget ripgrep jq xdg-user-dirs rsync go-yq git base-devel
-
+# ============================================================================
+#  SECCIÓN 2 — repos oficiales (sudo pacman -S)
+# ============================================================================
+## base / utilidades de la shell
+bc coreutils cliphist cmake curl wget ripgrep jq xdg-user-dirs rsync go-yq
 ## hyprland
-hyprland hyprsunset wl-clipboard
-
-## quickshell (runtime Qt6)
-cpptrace jemalloc mesa qt6-declarative qt6-base qt6-svg libdrm libpipewire libxcb wayland
-qt6-5compat qt6-avif-image-plugin qt6-imageformats qt6-multimedia qt6-positioning
-qt6-quicktimeline qt6-sensors qt6-tools qt6-translations qt6-virtualkeyboard qt6-wayland
-kirigami kdialog syntax-highlighting
-
+hyprland hyprsunset wl-clipboard hypridle hyprlock hyprpicker hyprshot
+## quickshell: runtime de Qt6
+cpptrace jemalloc mesa libdrm libpipewire libxcb wayland
+qt6-base qt6-declarative qt6-svg qt6-5compat qt6-imageformats qt6-multimedia
+qt6-positioning qt6-quicktimeline qt6-sensors qt6-tools qt6-translations
+qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
 ## widgets
-fuzzel glib2 imagemagick hypridle hyprlock hyprpicker songrec translate-shell wlogout libqalculate
-
+fuzzel glib2 imagemagick songrec translate-shell wlogout libqalculate
 ## audio
 cava pavucontrol-qt wireplumber pipewire-pulse libdbusmenu-gtk3 playerctl
-
-## backlight / sensores
+## brillo y sensores
 geoclue brightnessctl ddcutil
-
 ## captura de pantalla
-hyprshot slurp swappy tesseract tesseract-data-eng wf-recorder
-
-## toolkit
+slurp swappy tesseract tesseract-data-eng wf-recorder
+## entrada
 upower wtype ydotool
-
-## portales
+## portales xdg
 xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk xdg-desktop-portal-hyprland
-
-## kde / sesión
-bluedevil gnome-keyring networkmanager plasma-nm polkit-kde-agent dolphin systemsettings
-
-## fuentes y temas
-adw-gtk-theme-git breeze breeze-plus darkly-bin eza fish fontconfig kitty matugen
-otf-space-grotesk starship ttf-jetbrains-mono-nerd ttf-material-symbols-variable-git
-ttf-readex-pro ttf-rubik-vf ttf-twemoji illogical-impulse-bibata-modern-classic-bin
-
-## python (para el generador de colores)
+## sesión / kde
+bluedevil gnome-keyring networkmanager plasma-nm polkit-kde-agent dolphin systemsettings breeze
+## terminal, shell y tema
+fish starship kitty eza fontconfig matugen ttf-jetbrains-mono-nerd
+## python de la shell
 clang uv gtk4 libadwaita libsoup3 libportal-gtk4 gobject-introspection
 
-## extras que uso
-micro foot mpv btop fastfetch
+# ============================================================================
+#  SECCIÓN 3 — AUR (yay -S). Van ANTES de los metapaquetes: makepkg no resuelve
+#  dependencias del AUR, así que sin esto la sección 4 falla.
+# ============================================================================
+adw-gtk-theme-git breeze-plus darkly-bin qt6-avif-image-plugin
+otf-space-grotesk ttf-material-symbols-variable-git ttf-readex-pro
+ttf-rubik-vf ttf-twemoji
+
+# ============================================================================
+#  SECCIÓN 4 — metapaquetes, en orden de compilación (quickshell al final:
+#  es el que más tarda). Salen de end-4/dots-hyprland → sdata/dist-arch/
+# ============================================================================
+illogical-impulse-basic
+illogical-impulse-hyprland
+illogical-impulse-toolkit
+illogical-impulse-portal
+illogical-impulse-kde
+illogical-impulse-audio
+illogical-impulse-backlight
+illogical-impulse-screencapture
+illogical-impulse-widgets
+illogical-impulse-fonts-themes
+illogical-impulse-python
+illogical-impulse-bibata-modern-classic-bin
+illogical-impulse-quickshell-git
+
+# ============================================================================
+#  SECCIÓN 6 — fuente que no está empaquetada
+# ============================================================================
+# git clone https://github.com/end-4/google-sans-flex ~/.local/share/fonts/illogical-impulse-google-sans-flex
+
+# ============================================================================
+#  SECCIÓN 7 — extras opcionales (no hacen falta para la shell)
+# ============================================================================
+micro foot mpv btop fastfetch visual-studio-code-bin spotify

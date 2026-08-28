@@ -1,202 +1,417 @@
 #!/usr/bin/env bash
-# ============================================================================
-#  setup.sh — Instala Hyprland + Quickshell (ii) desde cero en Arch / CachyOS
-#             y luego aplica los dotfiles de este repo.
+# =============================================================================
+#  setup.sh — Instalación completa de Hyprland + Quickshell (ii) en Arch/CachyOS
 #
-#  Uso:   ./setup.sh              instalación completa
-#         ./setup.sh --deps       solo paquetes
-#         ./setup.sh --dots       solo la configuración (= install.sh)
-#         ./setup.sh --venv       solo el entorno Python de la shell
-#         ./setup.sh --fonts      solo las fuentes que no vienen en paquetes
-#         ./setup.sh --upstream   clona el fork end4-pC como referencia
-# ============================================================================
-set -euo pipefail
+#  Secciones (se ejecutan en este orden; el orden importa):
+#     0  Preparación del sistema        6  Fuentes
+#     1  Herramientas de compilación    7  Extras opcionales
+#     2  Dependencias de repos          8  Servicios
+#     3  Dependencias del AUR           9  Configuración (dotfiles + shim)
+#     4  Metapaquetes illogical-*      10  Fork de referencia
+#     5  Entorno Python (uv)           11  Verificación final
+#
+#  Uso:
+#     ./setup.sh                 todo, en orden
+#     ./setup.sh --list          muestra las secciones
+#     ./setup.sh --only 4        ejecuta solo la sección 4
+#     ./setup.sh --from 5        reanuda desde la sección 5 (útil si algo falló)
+#     ./setup.sh --skip-extras   omite la sección 7
+#     ./setup.sh --yes           sin confirmación inicial
+#
+#  Atajos: --deps (2,3,4)  --venv (5)  --fonts (6)  --dots (9)  --upstream (10)
+#
+#  Registro completo en ~/.cache/dots-setup/setup-<fecha>.log
+# =============================================================================
+set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# "illogical impulse" es el nombre del rice de end-4: sus metapaquetes
-# illogical-impulse-* viven en este repo, en sdata/dist-arch/.
-UPSTREAM="https://github.com/end-4/dots-hyprland.git"
-# Fork del que porto features hacia mi shell ii (solo referencia, no se instala).
-FORK="https://github.com/pctrade/end4-pC.git"
-# Fuente de la UI: no está empaquetada, se clona a mano (igual que hace end-4).
-FONT_REPO="https://github.com/end-4/google-sans-flex"
 WORKDIR="${XDG_CACHE_HOME:-$HOME/.cache}/dots-setup"
+LOG="$WORKDIR/setup-$(date +%Y%m%d-%H%M%S).log"
 VENV="$HOME/.local/state/quickshell/.venv"
 
-c_ok()   { printf '\033[1;32m::\033[0m %s\n' "$*"; }
-c_info() { printf '\033[1;34m::\033[0m %s\n' "$*"; }
-c_warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
-c_err()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; }
+UPSTREAM="https://github.com/end-4/dots-hyprland.git"   # "illogical impulse" es este repo
+FORK="https://github.com/pctrade/end4-pC.git"           # fork del que porto features
+FONT_REPO="https://github.com/end-4/google-sans-flex"   # fuente de la UI, sin empaquetar
 
-# ---------------------------------------------------------------- sudo, una sola vez
-# Pide la contraseña acá al principio y la mantiene viva en background (refresco
-# cada 60s) mientras dure el script, para que ningún `sudo` posterior (makepkg,
-# pacman, systemctl, etc.) la vuelva a pedir. Se mata sola al salir.
-SUDO_KEEPALIVE_PID=""
+FROM=0; ONLY=""; SKIP_EXTRAS=0; ASSUME_YES=0
+FAILED=()
+
+# -----------------------------------------------------------------------------
+#  Utilidades
+# -----------------------------------------------------------------------------
+b()      { printf '\n\033[1;36m━━ %s ━━\033[0m\n' "$*"; }
+info()   { printf '\033[1;34m::\033[0m %s\n' "$*"; }
+ok()     { printf '\033[1;32m ✓\033[0m %s\n' "$*"; }
+warn()   { printf '\033[1;33m !!\033[0m %s\n' "$*"; }
+err()    { printf '\033[1;31m xx\033[0m %s\n' "$*" >&2; }
+note_fail() { FAILED+=("$1"); err "$1"; }
+
+# Corre un comando y, si falla, lo anota sin abortar todo el script.
+try() {
+  local desc="$1"; shift
+  info "$desc"
+  if "$@" >>"$LOG" 2>&1; then ok "$desc"; return 0
+  else note_fail "$desc  (detalle en $LOG)"; return 1; fi
+}
+
+# Instala una lista de paquetes de una sola pasada; si el lote falla, reintenta
+# uno por uno para que un solo paquete roto no tumbe la instalación entera.
+install_batch() {
+  local mgr="$1"; shift
+  local -a pkgs=("$@")
+  info "Instalando ${#pkgs[@]} paquetes con $mgr"
+  if $mgr -S --needed --noconfirm "${pkgs[@]}" >>"$LOG" 2>&1; then
+    ok "los ${#pkgs[@]} paquetes quedaron instalados"; return 0
+  fi
+  warn "el lote falló; reintento uno por uno (esto tarda más)"
+  local p
+  for p in "${pkgs[@]}"; do
+    if $mgr -S --needed --noconfirm "$p" >>"$LOG" 2>&1; then
+      printf '   \033[1;32m✓\033[0m %s\n' "$p"
+    else
+      printf '   \033[1;31mx\033[0m %s\n' "$p"; FAILED+=("paquete: $p")
+    fi
+  done
+}
+
+# Pide la contraseña UNA sola vez y luego refresca el ticket de sudo en segundo
+# plano, para que ni pacman ni makepkg ni yay la vuelvan a pedir a mitad de todo.
+SUDO_LISTO=0
 sudo_keepalive() {
-  [ -n "$SUDO_KEEPALIVE_PID" ] && return   # ya está corriendo
-  sudo -v
-  ( while kill -0 "$$" 2>/dev/null; do sudo -n true; sleep 60; done ) &
-  SUDO_KEEPALIVE_PID=$!
-  trap '[ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+  [ "$SUDO_LISTO" -eq 1 ] && return 0
+  info "La instalación necesita sudo. Se te pedirá la contraseña una sola vez."
+  sudo -v || { err "Sin sudo no se puede seguir."; exit 1; }
+  ( while kill -0 "$$" 2>/dev/null; do sudo -n true 2>/dev/null; sleep 45; done ) &
+  SUDO_PID=$!
+  trap 'kill "$SUDO_PID" 2>/dev/null' EXIT INT TERM
+  SUDO_LISTO=1
+  ok "sudo listo; no te la volverá a pedir"
 }
 
-# ---------------------------------------------------------------- comprobaciones
-preflight() {
-  [ "$(id -u)" -eq 0 ] && { c_err "No lo corras como root. Usa tu usuario normal (pedirá sudo)."; exit 1; }
-  command -v pacman >/dev/null || { c_err "Esto es para Arch/CachyOS (no encontré pacman)."; exit 1; }
-  c_info "Pidiendo sudo (una sola vez; queda vivo mientras corre el script)"
-  sudo_keepalive
-  c_info "Actualizando el sistema primero"
-  sudo pacman -Syu --noconfirm --needed base-devel git
+# makepkg llama a sudo por su cuenta; con el ticket vivo no pregunta nada.
+# --noconfirm evita además las preguntas interactivas de pacman.
+
+# =============================================================================
+#  SECCIÓN 0 — Preparación del sistema
+# =============================================================================
+sec0_preparacion() {
+  b "0 · Preparación del sistema"
+  [ "$(id -u)" -eq 0 ] && { err "No lo corras como root; usa tu usuario (pedirá sudo)."; exit 1; }
+  command -v pacman >/dev/null || { err "Esto es para Arch/CachyOS: no encontré pacman."; exit 1; }
+  mkdir -p "$WORKDIR"; : > "$LOG"
+  info "Registro: $LOG"
+  try "Sincronizando repos y actualizando el sistema" sudo pacman -Syu --noconfirm
 }
 
-# ---------------------------------------------------------------- helper AUR
-ensure_aur() {
-  if command -v yay >/dev/null; then AUR=yay; return; fi
-  if command -v paru >/dev/null; then AUR=paru; return; fi
-  sudo_keepalive   # por si se llama sin preflight (p.ej. ./setup.sh --venv)
-  c_info "Instalando yay (helper de AUR)"
+# =============================================================================
+#  SECCIÓN 1 — Herramientas de compilación y helper de AUR
+#  Va antes que todo lo demás: sin base-devel no se compila nada del AUR.
+# =============================================================================
+sec1_toolchain() {
+  b "1 · Herramientas de compilación y AUR"
+  install_batch "sudo pacman" base-devel git rsync
+  if command -v yay >/dev/null;  then AUR=yay;  ok "yay ya está instalado";  return; fi
+  if command -v paru >/dev/null; then AUR=paru; ok "paru ya está instalado"; return; fi
   local d="$WORKDIR/yay-bin"
-  rm -rf "$d"; mkdir -p "$WORKDIR"
-  git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$d"
-  ( cd "$d" && makepkg -si --noconfirm )
+  rm -rf "$d"
+  try "Clonando yay-bin" git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$d"
+  ( cd "$d" && makepkg -si --noconfirm ) >>"$LOG" 2>&1 \
+    && ok "yay instalado" || note_fail "no se pudo instalar yay"
   AUR=yay
 }
 
-# ---------------------------------------------------------------- dependencias
-install_deps() {
-  ensure_aur
-  c_info "Clonando los metapaquetes de end-4 (dots-hyprland)"
-  mkdir -p "$WORKDIR"
-  if [ -d "$WORKDIR/dots-hyprland/.git" ]; then
-    git -C "$WORKDIR/dots-hyprland" pull --ff-only || true
-  else
-    git clone --depth 1 "$UPSTREAM" "$WORKDIR/dots-hyprland"
-  fi
-
-  local distdir="$WORKDIR/dots-hyprland/sdata/dist-arch"
-  if [ ! -d "$distdir" ]; then
-    c_err "No encontré $distdir — el upstream cambió de estructura."
-    c_warn "Instala a mano lo listado en packages.txt y vuelve a correr: ./setup.sh --dots"
-    return 1
-  fi
-
-  # Los metapaquetes illogical-impulse-* arrastran TODAS las dependencias
-  # (hyprland, quickshell, qt6, fuentes, portales, etc.). Se construyen aquí
-  # porque no están publicados en el AUR.
-  c_info "Construyendo e instalando los metapaquetes illogical-impulse-*"
-  local pkg
-  for pkg in "$distdir"/illogical-impulse-*; do
-    [ -f "$pkg/PKGBUILD" ] || continue
-    case "$(basename "$pkg")" in
-      illogical-impulse-microtex-git) continue ;;   # opcional (LaTeX en la shell)
-    esac
-    c_info "  → $(basename "$pkg")"
-    ( cd "$pkg" && makepkg -si --noconfirm --needed ) \
-      || c_warn "     falló $(basename "$pkg"); sigo con el resto"
-  done
-
-  c_info "Instalando los extras que uso además del set base"
-  $AUR -S --needed --noconfirm \
-    micro foot mpv btop fastfetch \
-    visual-studio-code-bin spotify \
-    qt6-avif-image-plugin || c_warn "algún extra no se pudo instalar"
+# =============================================================================
+#  SECCIÓN 2 — Dependencias de los repos oficiales
+#  Primero estas: los metapaquetes de la sección 4 las dan por hechas y así
+#  makepkg no tiene que resolver nada.
+# =============================================================================
+PKGS_REPO=(
+  # base / utilidades de la shell
+  bc coreutils cliphist cmake curl wget ripgrep jq xdg-user-dirs rsync go-yq
+  # hyprland
+  hyprland hyprsunset wl-clipboard hypridle hyprlock hyprpicker hyprshot
+  # quickshell: runtime de Qt6
+  cpptrace jemalloc mesa libdrm libpipewire libxcb wayland
+  qt6-base qt6-declarative qt6-svg qt6-5compat qt6-imageformats qt6-multimedia
+  qt6-positioning qt6-quicktimeline qt6-sensors qt6-tools qt6-translations
+  qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
+  # widgets
+  fuzzel glib2 imagemagick songrec translate-shell wlogout libqalculate
+  # audio
+  cava pavucontrol-qt wireplumber pipewire-pulse libdbusmenu-gtk3 playerctl
+  # brillo y sensores
+  geoclue brightnessctl ddcutil
+  # captura de pantalla
+  slurp swappy tesseract tesseract-data-eng wf-recorder
+  # entrada
+  upower wtype ydotool
+  # portales xdg
+  xdg-desktop-portal xdg-desktop-portal-kde xdg-desktop-portal-gtk xdg-desktop-portal-hyprland
+  # sesión / kde
+  bluedevil gnome-keyring networkmanager plasma-nm polkit-kde-agent dolphin systemsettings breeze
+  # terminal, shell y tema
+  fish starship kitty eza fontconfig matugen ttf-jetbrains-mono-nerd
+  # python de la shell
+  clang uv gtk4 libadwaita libsoup3 libportal-gtk4 gobject-introspection
+)
+sec2_repos() {
+  b "2 · Dependencias de los repos oficiales (${#PKGS_REPO[@]})"
+  install_batch "sudo pacman" "${PKGS_REPO[@]}"
 }
 
-# ---------------------------------------------------------------- venv python
-setup_venv() {
-  command -v uv >/dev/null || { c_warn "uv no está instalado; corre ./setup.sh --deps primero"; return 1; }
-  c_info "Creando el entorno Python de la shell en $VENV"
+# =============================================================================
+#  SECCIÓN 3 — Dependencias del AUR
+#  Van ANTES de los metapaquetes: makepkg solo resuelve dependencias de los
+#  repos oficiales, así que si estas faltan la sección 4 falla entera.
+# =============================================================================
+PKGS_AUR=(
+  adw-gtk-theme-git breeze-plus darkly-bin qt6-avif-image-plugin
+  otf-space-grotesk ttf-material-symbols-variable-git ttf-readex-pro
+  ttf-rubik-vf ttf-twemoji
+)
+sec3_aur() {
+  b "3 · Dependencias del AUR (${#PKGS_AUR[@]})"
+  command -v "${AUR:-yay}" >/dev/null || { note_fail "no hay helper de AUR; corre la sección 1"; return 1; }
+  install_batch "${AUR:-yay}" "${PKGS_AUR[@]}"
+}
+
+# =============================================================================
+#  SECCIÓN 4 — Metapaquetes illogical-impulse-*
+#  "illogical impulse" es el rice de end-4: sus metapaquetes viven en su repo
+#  (sdata/dist-arch) y no están publicados en el AUR, así que se compilan aquí.
+#  Se construyen en orden: primero los livianos, quickshell al final porque es
+#  el que más tarda.
+# =============================================================================
+META_ORDER=(
+  illogical-impulse-basic
+  illogical-impulse-hyprland
+  illogical-impulse-toolkit
+  illogical-impulse-portal
+  illogical-impulse-kde
+  illogical-impulse-audio
+  illogical-impulse-backlight
+  illogical-impulse-screencapture
+  illogical-impulse-widgets
+  illogical-impulse-fonts-themes
+  illogical-impulse-python
+  illogical-impulse-bibata-modern-classic-bin
+  illogical-impulse-quickshell-git
+)
+sec4_metapaquetes() {
+  b "4 · Metapaquetes illogical-impulse-* (${#META_ORDER[@]})"
+  mkdir -p "$WORKDIR"
+  local repo="$WORKDIR/dots-hyprland"
+  if [ -d "$repo/.git" ]; then
+    try "Actualizando el repo de end-4" git -C "$repo" pull --ff-only
+  else
+    try "Clonando end-4/dots-hyprland" git clone --depth 1 "$UPSTREAM" "$repo" || return 1
+  fi
+
+  local dist="$repo/sdata/dist-arch"
+  [ -d "$dist" ] || { note_fail "no existe $dist (el upstream cambió); instala a mano según packages.txt"; return 1; }
+
+  local m
+  for m in "${META_ORDER[@]}"; do
+    if [ ! -f "$dist/$m/PKGBUILD" ]; then warn "$m ya no está en el upstream, lo salto"; continue; fi
+    info "compilando $m"
+    if ( cd "$dist/$m" && makepkg -si --noconfirm --needed ) >>"$LOG" 2>&1; then
+      ok "$m"
+    else
+      note_fail "$m no se pudo instalar"
+    fi
+  done
+}
+
+# =============================================================================
+#  SECCIÓN 5 — Entorno Python de la shell
+#  Necesita 'uv', que llega en la sección 2. La lista fijada la manda el upstream.
+# =============================================================================
+sec5_venv() {
+  b "5 · Entorno Python (uv)"
+  command -v uv >/dev/null || { note_fail "falta uv (sección 2)"; return 1; }
   mkdir -p "$(dirname "$VENV")"
-  uv venv --prompt .venv -p 3.12 "$VENV"
+  try "Creando el venv en $VENV" uv venv --prompt .venv -p 3.12 "$VENV" || return 1
 
   local req="$WORKDIR/dots-hyprland/sdata/uv/requirements.txt"
   if [ -f "$req" ]; then
-    # Lista fijada por el upstream: es la fuente de verdad.
-    VIRTUAL_ENV="$VENV" uv pip install -r "$req" || c_warn "falló algún paquete de requirements.txt"
+    VIRTUAL_ENV="$VENV" try "Instalando requirements.txt del upstream" uv pip install -r "$req"
   else
-    c_warn "No encontré requirements.txt del upstream; uso la lista de respaldo"
-    VIRTUAL_ENV="$VENV" uv pip install \
+    warn "sin requirements.txt del upstream; uso la lista de respaldo"
+    VIRTUAL_ENV="$VENV" try "Instalando paquetes de Python" uv pip install \
       build pillow setuptools-scm wheel pywayland psutil kde-material-you-colors \
       materialyoucolor libsass material-color-utilities setproctitle click loguru \
-      pycairo pygobject tqdm numpy opencv-contrib-python google-auth requests \
-      || c_warn "algún paquete de Python falló"
+      pycairo pygobject tqdm numpy opencv-contrib-python google-auth requests
   fi
-
-  # Extras que usan mis widgets de correo/cuentas (no vienen en el upstream).
-  VIRTUAL_ENV="$VENV" uv pip install dbus-python cryptography \
-    || c_warn "no se pudieron instalar los extras de Python"
+  # Extras que usan mis widgets de correo/cuentas (no vienen en el upstream)
+  VIRTUAL_ENV="$VENV" try "Instalando extras de correo/cuentas" uv pip install dbus-python cryptography
 }
 
-# ---------------------------------------------------------------- fuentes
-install_fonts() {
+# =============================================================================
+#  SECCIÓN 6 — Fuentes
+# =============================================================================
+sec6_fuentes() {
+  b "6 · Fuentes"
   local dst="$HOME/.local/share/fonts/illogical-impulse-google-sans-flex"
   if [ -d "$dst/.git" ]; then
-    c_info "Google Sans Flex ya está; actualizando"
-    git -C "$dst" pull --ff-only || true
+    try "Actualizando Google Sans Flex" git -C "$dst" pull --ff-only
   else
-    c_info "Clonando Google Sans Flex en $dst"
     mkdir -p "$(dirname "$dst")"
-    git clone --depth 1 "$FONT_REPO" "$dst" || { c_warn "no se pudo clonar la fuente"; return 1; }
+    try "Clonando Google Sans Flex" git clone --depth 1 "$FONT_REPO" "$dst"
   fi
-  fc-cache -f >/dev/null 2>&1 || true
+  try "Refrescando la caché de fuentes" fc-cache -f
 }
 
-# ---------------------------------------------------------------- referencia
-clone_upstream_ref() {
+# =============================================================================
+#  SECCIÓN 7 — Extras opcionales (mis apps, no hacen falta para la shell)
+# =============================================================================
+PKGS_EXTRA=( micro foot mpv btop fastfetch visual-studio-code-bin spotify )
+sec7_extras() {
+  b "7 · Extras opcionales (${#PKGS_EXTRA[@]})"
+  [ "$SKIP_EXTRAS" -eq 1 ] && { info "omitidos (--skip-extras)"; return 0; }
+  install_batch "${AUR:-yay}" "${PKGS_EXTRA[@]}"
+}
+
+# =============================================================================
+#  SECCIÓN 8 — Servicios
+#  Después de instalar: las unidades no existen hasta que están los paquetes.
+# =============================================================================
+sec8_servicios() {
+  b "8 · Servicios"
+  local s
+  for s in bluetooth NetworkManager; do
+    sudo systemctl enable --now "$s.service" >>"$LOG" 2>&1 && ok "$s" || warn "$s no se pudo habilitar"
+  done
+  for s in ydotool pipewire.socket pipewire-pulse.socket wireplumber gnome-keyring-daemon.socket; do
+    systemctl --user enable --now "$s" >>"$LOG" 2>&1 && ok "usuario: $s" || warn "usuario: $s no disponible"
+  done
+  if ! id -nG | tr ' ' '\n' | grep -qx input; then
+    sudo usermod -aG input "$USER" >>"$LOG" 2>&1 \
+      && warn "te agregué al grupo 'input' (ydotool): hace falta reiniciar sesión" \
+      || warn "no pude agregarte al grupo 'input'"
+  else
+    ok "ya estás en el grupo 'input'"
+  fi
+}
+
+# =============================================================================
+#  SECCIÓN 9 — Configuración: dotfiles + shim + colores iniciales
+# =============================================================================
+sec9_dotfiles() {
+  b "9 · Configuración"
+  [ -x "$SRC/install.sh" ] || { note_fail "no encuentro install.sh junto a setup.sh"; return 1; }
+  "$SRC/install.sh" || note_fail "install.sh terminó con errores"
+}
+
+# =============================================================================
+#  SECCIÓN 10 — Fork de referencia (no se instala, solo para consultar)
+# =============================================================================
+sec10_referencia() {
+  b "10 · Fork de referencia end4-pC"
   local dst="$HOME/.config/quickshell/end4-pC"
-  if [ -d "$dst/.git" ]; then
-    c_info "El fork de referencia ya está en $dst"
+  if [ -d "$dst/.git" ]; then ok "ya está en $dst"; return 0; fi
+  mkdir -p "$(dirname "$dst")"
+  try "Clonando end4-pC" git clone --depth 1 "$FORK" "$dst"
+}
+
+# =============================================================================
+#  SECCIÓN 11 — Verificación final
+# =============================================================================
+sec11_verificacion() {
+  b "11 · Verificación"
+  [ -x "$SRC/doctor.sh" ] && "$SRC/doctor.sh" || warn "no encontré doctor.sh"
+}
+
+# -----------------------------------------------------------------------------
+#  Orquestación
+# -----------------------------------------------------------------------------
+SECCIONES=(
+  sec0_preparacion sec1_toolchain sec2_repos sec3_aur sec4_metapaquetes
+  sec5_venv sec6_fuentes sec7_extras sec8_servicios sec9_dotfiles
+  sec10_referencia sec11_verificacion
+)
+NOMBRES=(
+  "Preparación del sistema" "Herramientas de compilación y AUR"
+  "Dependencias de repos oficiales" "Dependencias del AUR"
+  "Metapaquetes illogical-impulse-*" "Entorno Python (uv)" "Fuentes"
+  "Extras opcionales" "Servicios" "Configuración (dotfiles + shim)"
+  "Fork de referencia" "Verificación final"
+)
+
+listar() { local i; for i in "${!NOMBRES[@]}"; do printf '  %2d  %s\n' "$i" "${NOMBRES[$i]}"; done; }
+
+resumen() {
+  echo
+  if [ "${#FAILED[@]}" -eq 0 ]; then
+    printf '\033[1;32m━━ Instalación completa, sin errores ━━\033[0m\n'
   else
-    c_info "Clonando el fork de referencia end4-pC en $dst"
-    mkdir -p "$(dirname "$dst")"
-    git clone "$FORK" "$dst" || c_warn "no se pudo clonar el fork de referencia"
+    printf '\033[1;33m━━ Terminó con %d problema(s) ━━\033[0m\n' "${#FAILED[@]}"
+    printf '   • %s\n' "${FAILED[@]}"
+    printf '   Log completo: %s\n' "$LOG"
+    printf '   Puedes reanudar con: ./setup.sh --from <n>\n'
   fi
+  echo
+  echo "  1. Ajusta ~/.config/hypr/monitors.conf a tus pantallas."
+  echo "  2. Revisa 'wallpaperPath' en ~/.config/illogical-impulse/config.json."
+  echo "  3. Cierra sesión y entra en Hyprland (o: hyprctl reload && qs -c ii)."
+  echo "  4. ¿Algo no carga? ./doctor.sh"
 }
 
-# ---------------------------------------------------------------- servicios
-enable_services() {
-  c_info "Habilitando servicios"
-  sudo systemctl enable --now bluetooth.service      2>/dev/null || true
-  sudo systemctl enable --now NetworkManager.service 2>/dev/null || true
-  systemctl --user enable --now ydotool.service      2>/dev/null || c_warn "ydotool.service no disponible aún"
-  systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service 2>/dev/null || true
-  systemctl --user enable --now gnome-keyring-daemon.socket 2>/dev/null || true
-  # ydotool necesita acceso a /dev/uinput
-  if ! groups | grep -qw input; then
-    c_info "Agregando $USER al grupo input (para ydotool); requiere volver a iniciar sesión"
-    sudo usermod -aG input "$USER" || true
-  fi
+# ------------------------------------------------------------------ argumentos
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --list)        listar; exit 0 ;;
+    --only)        ONLY="$2"; shift 2 ;;
+    --from)        FROM="$2"; shift 2 ;;
+    --skip-extras) SKIP_EXTRAS=1; shift ;;
+    --yes|-y)      ASSUME_YES=1; shift ;;
+    --deps)        ONLY="2,3,4"; shift ;;
+    --venv)        ONLY="5"; shift ;;
+    --fonts)       ONLY="6"; shift ;;
+    --dots)        ONLY="9"; shift ;;
+    --upstream)    ONLY="10"; shift ;;
+    --check)       ONLY="11"; shift ;;
+    -h|--help)     sed -n '2,28p' "$0"; exit 0 ;;
+    *)             err "Opción desconocida: $1"; echo; listar; exit 1 ;;
+  esac
+done
+
+mkdir -p "$WORKDIR"; : > "$LOG"
+
+# Secciones que tocan el sistema y por tanto necesitan root.
+NECESITAN_SUDO=(0 1 2 3 4 7 8)
+requiere_sudo() {
+  local n s
+  for n in "$@"; do
+    for s in "${NECESITAN_SUDO[@]}"; do [ "$n" -eq "$s" ] && return 0; done
+  done
+  return 1
 }
 
-# ---------------------------------------------------------------- dotfiles
-install_dots() {
-  c_info "Aplicando la configuración de este repo"
-  "$SRC/install.sh"
-}
+if [ -n "$ONLY" ]; then
+  # Las secciones sueltas también necesitan el helper de AUR resuelto.
+  command -v yay >/dev/null && AUR=yay || { command -v paru >/dev/null && AUR=paru || AUR=yay; }
+  IFS=',' read -ra sel <<< "$ONLY"
+  for n in "${sel[@]}"; do
+    [ "$n" -ge 0 ] 2>/dev/null && [ "$n" -lt "${#SECCIONES[@]}" ] || { err "sección inválida: $n"; exit 1; }
+  done
+  requiere_sudo "${sel[@]}" && sudo_keepalive
+  for n in "${sel[@]}"; do "${SECCIONES[$n]}"; done
+  resumen
+  exit 0
+fi
 
-# ---------------------------------------------------------------- main
-case "${1:-all}" in
-  --deps) preflight; install_deps ;;
-  --venv) ensure_aur >/dev/null 2>&1 || true; setup_venv ;;
-  --fonts) install_fonts ;;
-  --upstream) clone_upstream_ref ;;
-  --dots) install_dots ;;
-  all|"")
-    preflight
-    install_deps
-    setup_venv
-    install_fonts
-    enable_services
-    install_dots
-    clone_upstream_ref
-    echo
-    c_ok "Instalación terminada."
-    echo "   1. Ajusta ~/.config/hypr/monitors.conf a tus pantallas."
-    echo "   2. Cierra sesión y entra en Hyprland (o: hyprctl reload && qs -c ii)."
-    echo "   3. Si ydotool no responde, reinicia para que aplique el grupo 'input'."
-    echo "   4. Si algo no carga: ./doctor.sh te dice qué falta."
-    ;;
-  *) c_err "Opción desconocida: $1"; sed -n '2,12p' "$0"; exit 1 ;;
-esac
+if [ "$ASSUME_YES" -eq 0 ]; then
+  echo "Se va a instalar Hyprland + Quickshell (ii) y aplicar la configuración."
+  listar
+  read -rp $'\n¿Seguimos? [S/n] ' r
+  case "$r" in [nN]*) echo "cancelado"; exit 0 ;; esac
+fi
+
+# Una sola petición de contraseña para toda la corrida.
+sudo_keepalive
+
+for i in "${!SECCIONES[@]}"; do
+  [ "$i" -lt "$FROM" ] && continue
+  "${SECCIONES[$i]}"
+done
+resumen

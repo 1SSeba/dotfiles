@@ -37,26 +37,48 @@ cd ~/dotfiles
 
 Luego cierra sesión y entra en Hyprland.
 
-### Por partes
+### Secciones
+
+`setup.sh` va por secciones numeradas, en un orden que importa: primero los repos
+oficiales, luego el AUR (porque `makepkg` no resuelve dependencias del AUR), y solo
+entonces los metapaquetes.
+
+```
+ 0  Preparación del sistema            6  Fuentes
+ 1  Herramientas de compilación y AUR  7  Extras opcionales
+ 2  Dependencias de repos oficiales    8  Servicios
+ 3  Dependencias del AUR               9  Configuración (dotfiles + shim)
+ 4  Metapaquetes illogical-impulse-*  10  Fork de referencia
+ 5  Entorno Python (uv)               11  Verificación final
+```
+
+Pide la contraseña de sudo **una sola vez** al principio y mantiene el ticket vivo,
+así que ni pacman ni yay ni makepkg la vuelven a pedir a mitad de la instalación.
 
 | Comando | Qué hace |
 |---|---|
-| `./setup.sh` | Todo: paquetes + venv + servicios + configuración |
-| `./setup.sh --deps` | Solo paquetes (yay + metapaquetes `illogical-impulse-*` + extras) |
-| `./setup.sh --venv` | Solo el entorno Python de la shell (`~/.local/state/quickshell/.venv`) |
-| `./setup.sh --upstream` | Clona el fork de referencia `end4-pC` en `~/.config/quickshell/` |
-| `./setup.sh --dots` | Solo la configuración (igual que `./install.sh`) |
-| `./install.sh` | Copia la config a `~/.config` con backup previo |
-| `./setup.sh --fonts` | Solo la fuente Google Sans Flex (se clona, no viene empaquetada) |
+| `./setup.sh` | Todo, en orden |
+| `./setup.sh --list` | Lista las secciones |
+| `./setup.sh --from 5` | Reanuda desde la sección 5 (si algo falló) |
+| `./setup.sh --only 4` | Ejecuta solo una sección (acepta `2,3,4`) |
+| `./setup.sh --skip-extras` | Omite vscode/spotify y demás |
+| `./setup.sh --yes` | Sin confirmación inicial |
+| `./setup.sh --deps` | Atajo de `--only 2,3,4` |
+| `./setup.sh --venv` / `--fonts` / `--dots` / `--upstream` / `--check` | Atajos de 5 / 6 / 9 / 10 / 11 |
+| `./install.sh` | Solo configuración: copia con backup, compila el shim, siembra colores |
 | `./sync.sh` | Vuelca la config viva de `~/.config` a este repo |
 | `./doctor.sh` | Diagnostica por qué no carga la shell (no modifica nada) |
+
+Si un paquete falla, el script no se detiene: reintenta el lote uno por uno, sigue
+con el resto y al final lista lo que quedó pendiente. Todo queda registrado en
+`~/.cache/dots-setup/setup-<fecha>.log`.
 
 **De dónde salen las dependencias:** "illogical impulse" es el nombre del rice de end-4,
 así que `setup.sh` clona `end-4/dots-hyprland` y construye sus metapaquetes
 `illogical-impulse-*` desde `sdata/dist-arch/` (no están publicados en el AUR).
-Ellos arrastran hyprland, quickshell, Qt6, portales, fuentes y temas. El entorno
-Python sale del `sdata/uv/requirements.txt` fijado por el upstream.
-En `packages.txt` está la lista completa por si prefieres instalar a mano.
+Son 91 paquetes de repos oficiales + 9 del AUR + 13 metapaquetes. El entorno Python
+sale del `sdata/uv/requirements.txt` fijado por el upstream. La lista completa,
+ordenada por sección, está en `packages.txt`.
 
 `install.sh` respalda tu config actual en `~/.dotfiles-backup-<fecha>` antes de copiar.
 
