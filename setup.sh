@@ -28,10 +28,25 @@ c_info() { printf '\033[1;34m::\033[0m %s\n' "$*"; }
 c_warn() { printf '\033[1;33m!!\033[0m %s\n' "$*"; }
 c_err()  { printf '\033[1;31mxx\033[0m %s\n' "$*" >&2; }
 
+# ---------------------------------------------------------------- sudo, una sola vez
+# Pide la contraseña acá al principio y la mantiene viva en background (refresco
+# cada 60s) mientras dure el script, para que ningún `sudo` posterior (makepkg,
+# pacman, systemctl, etc.) la vuelva a pedir. Se mata sola al salir.
+SUDO_KEEPALIVE_PID=""
+sudo_keepalive() {
+  [ -n "$SUDO_KEEPALIVE_PID" ] && return   # ya está corriendo
+  sudo -v
+  ( while kill -0 "$$" 2>/dev/null; do sudo -n true; sleep 60; done ) &
+  SUDO_KEEPALIVE_PID=$!
+  trap '[ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+}
+
 # ---------------------------------------------------------------- comprobaciones
 preflight() {
   [ "$(id -u)" -eq 0 ] && { c_err "No lo corras como root. Usa tu usuario normal (pedirá sudo)."; exit 1; }
   command -v pacman >/dev/null || { c_err "Esto es para Arch/CachyOS (no encontré pacman)."; exit 1; }
+  c_info "Pidiendo sudo (una sola vez; queda vivo mientras corre el script)"
+  sudo_keepalive
   c_info "Actualizando el sistema primero"
   sudo pacman -Syu --noconfirm --needed base-devel git
 }
@@ -40,6 +55,7 @@ preflight() {
 ensure_aur() {
   if command -v yay >/dev/null; then AUR=yay; return; fi
   if command -v paru >/dev/null; then AUR=paru; return; fi
+  sudo_keepalive   # por si se llama sin preflight (p.ej. ./setup.sh --venv)
   c_info "Instalando yay (helper de AUR)"
   local d="$WORKDIR/yay-bin"
   rm -rf "$d"; mkdir -p "$WORKDIR"
