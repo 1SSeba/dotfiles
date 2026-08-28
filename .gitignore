@@ -1,0 +1,20 @@
+# Backups y temporales
+*.bak
+*.bak.*
+*.bak[0-9]*
+*.tar.gz
+*.zip
+*~
+__pycache__/
+*.log
+
+# Estado generado en runtime (no es configuración)
+.config/quickshell/ii-backups/
+.config/illogical-impulse/installed_listfile
+.config/illogical-impulse/installed_true
+
+# Nunca subir credenciales
+*.pem
+*.key
+.env
+**/secrets*
