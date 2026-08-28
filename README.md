@@ -69,6 +69,10 @@ así que ni pacman ni yay ni makepkg la vuelven a pedir a mitad de la instalaci�
 | `./sync.sh` | Vuelca la config viva de `~/.config` a este repo |
 | `./doctor.sh` | Diagnostica por qué no carga la shell (no modifica nada) |
 
+Muestra una barra de progreso por sección y por paquete, y **la salida de pacman,
+yay y makepkg va en vivo a la pantalla** además del log. Compilar quickshell tarda
+varios minutos: mientras se vea salida, está trabajando.
+
 Si un paquete falla, el script no se detiene: reintenta el lote uno por uno, sigue
 con el resto y al final lista lo que quedó pendiente. Todo queda registrado en
 `~/.cache/dots-setup/setup-<fecha>.log`.
@@ -119,3 +123,4 @@ Causas típicas en un equipo nuevo:
 | Barra sin colores / iconos cuadrados | faltan los colores generados o las fuentes | `./install.sh` y `./setup.sh --fonts` |
 | El fondo no aparece | `wallpaperPath` apunta a la otra máquina | cámbialo en `~/.config/illogical-impulse/config.json` |
 | Banner rojo de error de config | falta algún archivo que `hyprland.conf` hace `source` | `./doctor.sh` te dice cuál |
+| `yay` parece colgado instalando | estaba esperando una respuesta invisible | ya no: la salida va en vivo y yay corre con `--answer*=None` |

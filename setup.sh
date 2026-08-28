@@ -39,12 +39,41 @@ FAILED=()
 # -----------------------------------------------------------------------------
 #  Utilidades
 # -----------------------------------------------------------------------------
-b()      { printf '\n\033[1;36m━━ %s ━━\033[0m\n' "$*"; }
+# Barra de progreso: barra <hechos> <total> <etiqueta>
+barra() {
+  local cur="$1" tot="$2" etiqueta="${3:-}"
+  local ancho=28
+  local pct=$(( tot > 0 ? cur * 100 / tot : 0 ))
+  local llenos=$(( tot > 0 ? cur * ancho / tot : 0 ))
+  local vacios=$(( ancho - llenos ))
+  local barraTxt=''
+  local i
+  for (( i = 0; i < llenos; i++ )); do barraTxt+='█'; done
+  for (( i = 0; i < vacios; i++ )); do barraTxt+='░'; done
+  printf '\033[1;36m[\033[0m%s\033[1;36m]\033[0m %3d%%  %s/%s  %s\n' \
+    "$barraTxt" "$pct" "$cur" "$tot" "$etiqueta"
+}
+
+# Cabecera de sección, con la barra del avance general.
+SEC_ACTUAL=0
+SEC_TOTAL=12
+b() {
+  printf '\n\033[1;36m━━ %s ━━\033[0m\n' "$*"
+  barra "$SEC_ACTUAL" "$SEC_TOTAL" "sección $SEC_ACTUAL de $SEC_TOTAL"
+}
 info()   { printf '\033[1;34m::\033[0m %s\n' "$*"; }
 ok()     { printf '\033[1;32m ✓\033[0m %s\n' "$*"; }
 warn()   { printf '\033[1;33m !!\033[0m %s\n' "$*"; }
 err()    { printf '\033[1;31m xx\033[0m %s\n' "$*" >&2; }
 note_fail() { FAILED+=("$1"); err "$1"; }
+
+# Corre un comando mostrando su salida en pantalla y guardándola en el log.
+# Nada de silenciar la salida: si pacman/yay/makepkg preguntan algo, se tiene
+# que ver. Antes iba todo al log y una pregunta invisible parecía un cuelgue.
+run_visible() {
+  "$@" 2>&1 | tee -a "$LOG"
+  return "${PIPESTATUS[0]}"
+}
 
 # Corre un comando y, si falla, lo anota sin abortar todo el script.
 try() {
@@ -54,19 +83,36 @@ try() {
   else note_fail "$desc  (detalle en $LOG)"; return 1; fi
 }
 
+# Flags según el gestor. Los de yay/paru son los que evitan que se quede
+# esperando respuesta: sin ellos pregunta por diffs, por editar el PKGBUILD y
+# por cuál proveedor usar, y con la salida oculta eso parecía un cuelgue.
+mgr_flags() {
+  case "$1" in
+    yay)  printf '%s ' -S --needed --noconfirm --answerclean=None \
+                        --answerdiff=None --answeredit=None \
+                        --answerupgrade=None --removemake --sudoloop ;;
+    paru) printf '%s ' -S --needed --noconfirm --skipreview --removemake --sudoloop ;;
+    *)        printf '%s ' -S --needed --noconfirm ;;
+  esac
+}
+
 # Instala una lista de paquetes de una sola pasada; si el lote falla, reintenta
 # uno por uno para que un solo paquete roto no tumbe la instalación entera.
 install_batch() {
   local mgr="$1"; shift
   local -a pkgs=("$@")
+  local -a flags; read -ra flags <<< "$(mgr_flags "${mgr##* }")"
   info "Instalando ${#pkgs[@]} paquetes con $mgr"
-  if $mgr -S --needed --noconfirm "${pkgs[@]}" >>"$LOG" 2>&1; then
+  info "(la salida va en vivo; también queda en $LOG)"
+  if run_visible $mgr "${flags[@]}" "${pkgs[@]}"; then
     ok "los ${#pkgs[@]} paquetes quedaron instalados"; return 0
   fi
   warn "el lote falló; reintento uno por uno (esto tarda más)"
-  local p
+  local p i=0 n="${#pkgs[@]}"
   for p in "${pkgs[@]}"; do
-    if $mgr -S --needed --noconfirm "$p" >>"$LOG" 2>&1; then
+    i=$(( i + 1 ))
+    barra "$i" "$n" "$p"
+    if run_visible $mgr "${flags[@]}" "$p"; then
       printf '   \033[1;32m✓\033[0m %s\n' "$p"
     else
       printf '   \033[1;31mx\033[0m %s\n' "$p"; FAILED+=("paquete: $p")
@@ -81,7 +127,10 @@ sudo_keepalive() {
   [ "$SUDO_LISTO" -eq 1 ] && return 0
   info "La instalación necesita sudo. Se te pedirá la contraseña una sola vez."
   sudo -v || { err "Sin sudo no se puede seguir."; exit 1; }
-  ( while kill -0 "$$" 2>/dev/null; do sudo -n true 2>/dev/null; sleep 45; done ) &
+  ( while kill -0 "$$" 2>/dev/null; do
+      sudo -n true 2>/dev/null || printf '\033[1;33m !!\033[0m el ticket de sudo caducó; el siguiente paso pedirá la contraseña\n'
+      sleep 45
+    done ) &
   SUDO_PID=$!
   trap 'kill "$SUDO_PID" 2>/dev/null' EXIT INT TERM
   SUDO_LISTO=1
@@ -115,7 +164,7 @@ sec1_toolchain() {
   local d="$WORKDIR/yay-bin"
   rm -rf "$d"
   try "Clonando yay-bin" git clone --depth 1 https://aur.archlinux.org/yay-bin.git "$d"
-  ( cd "$d" && makepkg -si --noconfirm ) >>"$LOG" 2>&1 \
+  ( cd "$d" && run_visible makepkg -si --noconfirm ) \
     && ok "yay instalado" || note_fail "no se pudo instalar yay"
   AUR=yay
 }
@@ -210,11 +259,13 @@ sec4_metapaquetes() {
   local dist="$repo/sdata/dist-arch"
   [ -d "$dist" ] || { note_fail "no existe $dist (el upstream cambió); instala a mano según packages.txt"; return 1; }
 
-  local m
+  local m i=0 n="${#META_ORDER[@]}"
   for m in "${META_ORDER[@]}"; do
+    i=$(( i + 1 ))
     if [ ! -f "$dist/$m/PKGBUILD" ]; then warn "$m ya no está en el upstream, lo salto"; continue; fi
-    info "compilando $m"
-    if ( cd "$dist/$m" && makepkg -si --noconfirm --needed ) >>"$LOG" 2>&1; then
+    barra "$i" "$n" "$m"
+    info "compilando $m  (quickshell puede tardar varios minutos)"
+    if ( cd "$dist/$m" && run_visible makepkg -si --noconfirm --needed ); then
       ok "$m"
     else
       note_fail "$m no se pudo instalar"
@@ -341,6 +392,7 @@ listar() { local i; for i in "${!NOMBRES[@]}"; do printf '  %2d  %s\n' "$i" "${N
 
 resumen() {
   echo
+  barra "$SEC_TOTAL" "$SEC_TOTAL" "terminado"
   if [ "${#FAILED[@]}" -eq 0 ]; then
     printf '\033[1;32m━━ Instalación completa, sin errores ━━\033[0m\n'
   else
@@ -395,7 +447,8 @@ if [ -n "$ONLY" ]; then
     [ "$n" -ge 0 ] 2>/dev/null && [ "$n" -lt "${#SECCIONES[@]}" ] || { err "sección inválida: $n"; exit 1; }
   done
   requiere_sudo "${sel[@]}" && sudo_keepalive
-  for n in "${sel[@]}"; do "${SECCIONES[$n]}"; done
+  SEC_TOTAL="${#sel[@]}"; SEC_ACTUAL=0
+  for n in "${sel[@]}"; do SEC_ACTUAL=$(( SEC_ACTUAL + 1 )); "${SECCIONES[$n]}"; done
   resumen
   exit 0
 fi
@@ -410,8 +463,10 @@ fi
 # Una sola petición de contraseña para toda la corrida.
 sudo_keepalive
 
+SEC_TOTAL="${#SECCIONES[@]}"
 for i in "${!SECCIONES[@]}"; do
   [ "$i" -lt "$FROM" ] && continue
+  SEC_ACTUAL=$(( i + 1 ))
   "${SECCIONES[$i]}"
 done
 resumen
