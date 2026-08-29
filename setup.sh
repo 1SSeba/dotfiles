@@ -7,8 +7,8 @@
 #     1  Herramientas de compilación    7  Extras opcionales
 #     2  Dependencias de repos          8  Servicios
 #     3  Dependencias del AUR           9  Configuración (dotfiles + shim)
-#     4  Metapaquetes illogical-*      10  Fork de referencia
-#     5  Entorno Python (uv)           11  Verificación final
+#     4  Metapaquetes illogical-*      10  Verificación final
+#     5  Entorno Python (uv)
 #
 #  Uso:
 #     ./setup.sh                 todo, en orden
@@ -18,7 +18,7 @@
 #     ./setup.sh --skip-extras   omite la sección 7
 #     ./setup.sh --yes           sin confirmación inicial
 #
-#  Atajos: --deps (2,3,4)  --venv (5)  --fonts (6)  --dots (9)  --upstream (10)
+#  Atajos: --deps (2,3,4)  --venv (5)  --fonts (6)  --dots (9)  --check (10)
 #
 #  Registro completo en ~/.cache/dots-setup/setup-<fecha>.log
 # =============================================================================
@@ -30,7 +30,6 @@ LOG="$WORKDIR/setup-$(date +%Y%m%d-%H%M%S).log"
 VENV="$HOME/.local/state/quickshell/.venv"
 
 UPSTREAM="https://github.com/end-4/dots-hyprland.git"   # "illogical impulse" es este repo
-FORK="https://github.com/pctrade/end4-pC.git"           # fork del que porto features
 FONT_REPO="https://github.com/end-4/google-sans-flex"   # fuente de la UI, sin empaquetar
 
 FROM=0; ONLY=""; SKIP_EXTRAS=0; ASSUME_YES=0
@@ -303,21 +302,10 @@ sec9_dotfiles() {
 }
 
 # =============================================================================
-#  SECCIÓN 10 — Fork de referencia (no se instala, solo para consultar)
+#  SECCIÓN 10 — Verificación final
 # =============================================================================
-sec10_referencia() {
-  b "10 · Fork de referencia end4-pC"
-  local dst="$HOME/.config/quickshell/end4-pC"
-  if [ -d "$dst/.git" ]; then ok "ya está en $dst"; return 0; fi
-  mkdir -p "$(dirname "$dst")"
-  try "Clonando end4-pC" git clone --depth 1 "$FORK" "$dst"
-}
-
-# =============================================================================
-#  SECCIÓN 11 — Verificación final
-# =============================================================================
-sec11_verificacion() {
-  b "11 · Verificación"
+sec10_verificacion() {
+  b "10 · Verificación"
   [ -x "$SRC/doctor.sh" ] && "$SRC/doctor.sh" || warn "no encontré doctor.sh"
 }
 
@@ -327,14 +315,14 @@ sec11_verificacion() {
 SECCIONES=(
   sec0_preparacion sec1_toolchain sec2_repos sec3_aur sec4_metapaquetes
   sec5_venv sec6_fuentes sec7_extras sec8_servicios sec9_dotfiles
-  sec10_referencia sec11_verificacion
+  sec10_verificacion
 )
 NOMBRES=(
   "Preparación del sistema" "Herramientas de compilación y AUR"
   "Dependencias de repos oficiales" "Dependencias del AUR"
   "Metapaquetes illogical-impulse-*" "Entorno Python (uv)" "Fuentes"
   "Extras opcionales" "Servicios" "Configuración (dotfiles + shim)"
-  "Fork de referencia" "Verificación final"
+  "Verificación final"
 )
 
 listar() { local i; for i in "${!NOMBRES[@]}"; do printf '  %2d  %s\n' "$i" "${NOMBRES[$i]}"; done; }
@@ -368,8 +356,7 @@ while [ $# -gt 0 ]; do
     --venv)        ONLY="5"; shift ;;
     --fonts)       ONLY="6"; shift ;;
     --dots)        ONLY="9"; shift ;;
-    --upstream)    ONLY="10"; shift ;;
-    --check)       ONLY="11"; shift ;;
+    --check)       ONLY="10"; shift ;;
     -h|--help)     sed -n '2,28p' "$0"; exit 0 ;;
     *)             err "Opción desconocida: $1"; echo; listar; exit 1 ;;
   esac

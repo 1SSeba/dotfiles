@@ -21,8 +21,8 @@ También incluye, fuera de `~/.config`:
 - `state-seed/` — colores por defecto para `~/.local/state/quickshell/user/generated`,
   para que la shell tenga tema en el primer arranque.
 
-No incluye: `quickshell/end4-pC` (es el upstream de end-4, se clona aparte), backups `*.bak.*`,
-caches y estado generado en `~/.local/state/quickshell`.
+No incluye: backups `*.dotfiles-backup-*`, caches y estado generado en
+`~/.local/state/quickshell`.
 
 ## Instalar en un equipo nuevo (Arch / CachyOS)
 
@@ -48,8 +48,8 @@ entonces los metapaquetes.
  1  Herramientas de compilación y AUR  7  Extras opcionales
  2  Dependencias de repos oficiales    8  Servicios
  3  Dependencias del AUR               9  Configuración (dotfiles + shim)
- 4  Metapaquetes illogical-impulse-*  10  Fork de referencia
- 5  Entorno Python (uv)               11  Verificación final
+ 4  Metapaquetes illogical-impulse-*  10  Verificación final
+ 5  Entorno Python (uv)
 ```
 
 Pide la contraseña de sudo **una sola vez** al principio y mantiene el ticket vivo,
@@ -64,8 +64,9 @@ así que ni pacman ni yay ni makepkg la vuelven a pedir a mitad de la instalaci�
 | `./setup.sh --skip-extras` | Omite vscode/spotify y demás |
 | `./setup.sh --yes` | Sin confirmación inicial |
 | `./setup.sh --deps` | Atajo de `--only 2,3,4` |
-| `./setup.sh --venv` / `--fonts` / `--dots` / `--upstream` / `--check` | Atajos de 5 / 6 / 9 / 10 / 11 |
-| `./install.sh` | Solo configuración: copia con backup, compila el shim, siembra colores |
+| `./setup.sh --venv` / `--fonts` / `--dots` / `--check` | Atajos de 5 / 6 / 9 / 10 |
+| `./install.sh` | Solo configuración: copia con backup, compila el shim, siembra colores, verifica |
+| `./install.sh --dry-run` | Muestra qué cambiaría, sin tocar nada |
 | `./sync.sh` | Vuelca la config viva de `~/.config` a este repo |
 | `./doctor.sh` | Diagnostica por qué no carga la shell (no modifica nada) |
 
@@ -80,7 +81,9 @@ Son 91 paquetes de repos oficiales + 9 del AUR + 13 metapaquetes. El entorno Pyt
 sale del `sdata/uv/requirements.txt` fijado por el upstream. La lista completa,
 ordenada por sección, está en `packages.txt`.
 
-`install.sh` respalda tu config actual en `~/.dotfiles-backup-<fecha>` antes de copiar.
+`install.sh` respalda tu config actual en `~/.dotfiles-backup-<fecha>` antes de copiar
+(se queda solo con los últimos 5 backups, poda el resto), y al final verifica que todo
+lo del repo haya llegado a `~/.config`.
 
 Si solo quieres recargar sin reiniciar sesión:
 
@@ -92,8 +95,9 @@ qs -c ii      # o el alias `q`
 ## Notas por equipo
 
 - `.config/hypr/monitors.conf` es específico de cada máquina: ajústalo tras instalar.
-- El upstream de referencia, si lo quieres tener al lado:
-  `git clone https://github.com/end-4/dots-hyprland ~/.config/quickshell/end4-pC`
+- `setup.sh` ya no clona ningún fork de referencia; si en algún momento quieres
+  comparar contra el upstream de end-4, clónalo tú a mano donde prefieras:
+  `git clone https://github.com/end-4/dots-hyprland /ruta/que/quieras`
 - Dependencias: hyprland, quickshell, matugen, fuzzel, kitty, starship, eza, cava, wlogout.
 
 ## Actualizar el repo desde la máquina en uso
