@@ -32,6 +32,9 @@ Singleton {
         const idx = list.findIndex(n => n.id === id)
         if (idx >= 0) {
             list[idx].content = content
+            // Para poder mostrar "editado hace..." y ordenar por lo más reciente
+            // (de creación o de edición) sin tener que adivinar cuál de las dos.
+            list[idx].updatedAt = Date.now()
             if (attachments !== undefined)
                 list[idx].attachments = attachments
             root.list = list.slice(0)
