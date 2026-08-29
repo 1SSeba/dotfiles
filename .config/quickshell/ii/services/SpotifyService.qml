@@ -729,8 +729,18 @@ Singleton {
         onTriggered: root.sync()
     }
 
-    Component.onCompleted: if (root.connected) {
-        root.validate();
-        root.refreshAll();
+    // A diferencia de MailService/GoogleAccount/AppleAccount/AiSession, esto no
+    // pedía el keyring por su cuenta: dependía de que otro feature (Mail, la
+    // cuenta de Google, etc.) lo hubiera disparado antes. Si el usuario sólo usa
+    // Spotify, `connected` queda en false para siempre después de reiniciar la
+    // shell, aunque el token siga siendo válido en el keyring del sistema — el
+    // `onConnectedChanged` de arriba nunca llega a dispararse porque nada le
+    // avisa al keyring que lo cargue.
+    Component.onCompleted: {
+        if (!KeyringStorage.loaded) KeyringStorage.fetchKeyringData();
+        if (root.connected) {
+            root.validate();
+            root.refreshAll();
+        }
     }
 }
