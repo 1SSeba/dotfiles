@@ -13,7 +13,7 @@ AbstractBackgroundWidget {
     configEntryName: "worldClock"
     hoverEnabled: true
 
-    property string sizeMode: root.configEntry.sizeMode ?? "2x2"
+    property string sizeMode: root.effective("sizeMode") ?? "2x2"
 
     property real widgetWidth:  sizeMode === "2x2" ? 276 : 420
     property real widgetHeight: sizeMode === "2x2" ? 252 : 120
@@ -319,7 +319,7 @@ AbstractBackgroundWidget {
                 locked: Config.options.background.widgetsLocked || root.showingSettings
                 currentWidth: root.widgetWidth
                 onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx) }
-                onResizeFinished: { root.configEntry.sizeMode = root.sizeMode }
+                onResizeFinished: { root.writeOverride("sizeMode", root.sizeMode) }
             }
         }
     }

@@ -10,6 +10,9 @@ AbstractWidget {
     id: root
 
     required property string configEntryName
+    // Nombre de la pantalla donde vive esta instancia (el de 'hyprctl monitors'),
+    // para saber si tiene su propio override en 'configEntry.screens'.
+    required property string screenName
     required property int screenWidth
     required property int screenHeight
     required property int scaledScreenWidth
@@ -17,9 +20,27 @@ AbstractWidget {
     required property real wallpaperScale
     property bool visibleWhenLocked: Config.options.lock.showWidgets
     property var configEntry: Config.options.background.widgets[configEntryName]
-    property string placementStrategy: configEntry.placementStrategy
-    property real targetX: Math.max(0, Math.min(configEntry.x, scaledScreenWidth - width))
-    property real targetY : Math.max(0, Math.min(configEntry.y, scaledScreenHeight - height))
+
+    // ---- Overrides por pantalla ----
+    // El override de esta pantalla en particular, o {} si nunca se customizó acá.
+    readonly property var screenOverride: (root.configEntry.screens && root.configEntry.screens[root.screenName]) || ({})
+    /** El valor de 'key' para esta pantalla: el override si existe, si no el global. */
+    function effective(key) {
+        const own = root.screenOverride[key];
+        return own !== undefined ? own : root.configEntry[key];
+    }
+    /** Guarda 'key' como override propio de esta pantalla, sin tocar las demás. */
+    function writeOverride(key, value) {
+        const screens = Object.assign({}, root.configEntry.screens ?? {});
+        const entry = Object.assign({}, screens[root.screenName] ?? {});
+        entry[key] = value;
+        screens[root.screenName] = entry;
+        root.configEntry.screens = screens;
+    }
+
+    property string placementStrategy: root.effective("placementStrategy")
+    property real targetX: Math.max(0, Math.min(root.effective("x"), scaledScreenWidth - width))
+    property real targetY : Math.max(0, Math.min(root.effective("y"), scaledScreenHeight - height))
     x: targetX
     y: targetY
     visible: opacity > 0
@@ -39,10 +60,10 @@ AbstractWidget {
     }
 
     onReleased: {
-        configEntry.x = root.x;
-        configEntry.y = root.y;
-        root.targetX = Qt.binding(() => Math.max(0, Math.min(configEntry.x, scaledScreenWidth - width)));
-        root.targetY = Qt.binding(() => Math.max(0, Math.min(configEntry.y, scaledScreenHeight - height)));
+        root.writeOverride("x", root.x);
+        root.writeOverride("y", root.y);
+        root.targetX = Qt.binding(() => Math.max(0, Math.min(root.effective("x"), scaledScreenWidth - width)));
+        root.targetY = Qt.binding(() => Math.max(0, Math.min(root.effective("y"), scaledScreenHeight - height)));
         root.restoreXYBinding();
     }
 

@@ -17,7 +17,7 @@ AbstractBackgroundWidget {
     property real cardSpacing: 12
     property real cardHeight: 120
     property real cardWidth: (widgetWidth - cardSpacing * 2) / 3
-    property bool isVertical: root.configEntry.vertical ?? false
+    property bool isVertical: root.effective("vertical") ?? false
     property bool hasBattery: Battery.available
 
     implicitWidth: row.implicitWidth
@@ -155,7 +155,7 @@ AbstractBackgroundWidget {
             cursorShape: Qt.PointingHandCursor
             onClicked: {
                 root.isVertical = !root.isVertical
-                root.configEntry.vertical = root.isVertical
+                root.writeOverride("vertical", root.isVertical)
             }
         }
     }

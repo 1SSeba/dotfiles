@@ -23,7 +23,7 @@ AbstractBackgroundWidget {
     readonly property real snapHeight2: 120
     readonly property real snapHeight3: 252
 
-    property string sizeMode: root.configEntry.sizeMode ?? "2x2"
+    property string sizeMode: root.effective("sizeMode") ?? "2x2"
 
     property real widgetWidth: {
         switch (root.sizeMode) {
@@ -540,7 +540,7 @@ AbstractBackgroundWidget {
             resizeMode: "diagonal"
             onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
             onResizeFinished: {
-                root.configEntry.sizeMode = root.sizeMode
+                root.writeOverride("sizeMode", root.sizeMode)
             }
         }
     }

@@ -21,7 +21,7 @@ AbstractBackgroundWidget {
     readonly property real snapWidth2: singleWidth * 2 + cardSpacing  
     readonly property real snapWidth3: singleWidth * 2 + cardSpacing  
 
-    property string sizeMode: root.configEntry.sizeMode ?? "2x2"
+    property string sizeMode: root.effective("sizeMode") ?? "2x2"
 
     property real widgetWidth: {
         switch (root.sizeMode) {
@@ -64,6 +64,30 @@ AbstractBackgroundWidget {
         return d
     }
 
+    /** Clave local YYYY-MM-DD, la misma forma que usa el servicio Calendars. */
+    function dateKey(d) {
+        const month = String(d.getMonth() + 1).padStart(2, "0")
+        const day = String(d.getDate()).padStart(2, "0")
+        return `${d.getFullYear()}-${month}-${day}`
+    }
+    readonly property string todayKey: root.dateKey(root.today)
+    readonly property var todayEvents: Calendars.eventsOn(root.todayKey)
+
+    /**
+     * Al moverse de mes hay que asegurarse de que Calendars ya tenga esos
+     * eventos. `ensureWindow` no pide nada si la ventana actual ya los cubría,
+     * así que se puede llamar sin miedo en cada cambio (ver CalendarWidget del
+     * sidebar, que usa el mismo patrón).
+     */
+    function syncEventWindow() {
+        if (!Calendars.enabled) return;
+        const first = new Date(root.viewingDate.getFullYear(), root.viewingDate.getMonth() - 1, 1);
+        const last = new Date(root.viewingDate.getFullYear(), root.viewingDate.getMonth() + 2, 1);
+        Calendars.ensureWindow(first, last);
+    }
+    onMonthShiftChanged: root.syncEventWindow()
+    Component.onCompleted: root.syncEventWindow()
+
     function getMonthMatrix(date) {
         const year  = date.getFullYear()
         const month = date.getMonth()
@@ -73,20 +97,23 @@ AbstractBackgroundWidget {
         const daysInPrevMonth = new Date(year, month, 0).getDate()
 
         let cells = []
-        for (let i = 0; i < startOffset; i++)
-            cells.push({ day: daysInPrevMonth - startOffset + i + 1, currentMonth: false, isToday: false })
+        for (let i = 0; i < startOffset; i++) {
+            const d = daysInPrevMonth - startOffset + i + 1
+            cells.push({ day: d, currentMonth: false, isToday: false, dateKey: root.dateKey(new Date(year, month - 1, d)) })
+        }
 
         for (let d = 1; d <= daysInMonth; d++) {
             const isToday = monthShift === 0
                 && d === today.getDate()
                 && month === today.getMonth()
                 && year  === today.getFullYear()
-            cells.push({ day: d, currentMonth: true, isToday: isToday })
+            cells.push({ day: d, currentMonth: true, isToday: isToday, dateKey: root.dateKey(new Date(year, month, d)) })
         }
 
         let nextDay = 1
         while (cells.length < 42) {
-            cells.push({ day: nextDay++, currentMonth: false, isToday: false })
+            cells.push({ day: nextDay, currentMonth: false, isToday: false, dateKey: root.dateKey(new Date(year, month + 1, nextDay)) })
+            nextDay++
         }
 
         let weeks = []
@@ -113,10 +140,19 @@ AbstractBackgroundWidget {
     }
 
     component DayCell: Rectangle {
+        id: dayCell
         property int day: 0
         property bool currentMonth: true
         property bool isToday: false
         property bool bold: false
+        // Clave YYYY-MM-DD de este día; vacía = no se puede consultar Calendars.
+        property string dateKey: ""
+        readonly property var dayEvents: dayCell.dateKey.length > 0 ? Calendars.eventsOn(dayCell.dateKey) : []
+        readonly property int eventCount: dayCell.dayEvents.length
+        readonly property color dotColor: {
+            const own = dayCell.dayEvents[0]?.color ?? "";
+            return own.length > 0 ? own : Appearance.colors.colPrimary;
+        }
 
         implicitWidth: 28
         implicitHeight: 28
@@ -132,6 +168,44 @@ AbstractBackgroundWidget {
                 ? Appearance.colors.colOnPrimary
                 : Appearance.colors.colOnLayer0
             opacity: parent.currentMonth ? 1.0 : 0.3
+        }
+
+        // Un punto por evento, hasta tres, igual que en el calendario del sidebar.
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 3
+            spacing: 2
+            visible: dayCell.eventCount > 0
+
+            Repeater {
+                model: Math.min(dayCell.eventCount, 3)
+                delegate: Rectangle {
+                    width: 3
+                    height: 3
+                    radius: 1.5
+                    color: dayCell.isToday ? Appearance.colors.colOnPrimary : dayCell.dotColor
+                    opacity: dayCell.currentMonth ? 1 : 0.45
+                }
+            }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: dayCell.eventCount > 0
+            cursorShape: dayCell.eventCount > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: Calendars.openDay(dayCell.dateKey)
+        }
+
+        // Qué hay ese día, sin gastar espacio de layout.
+        StyledToolTip {
+            extraVisibleCondition: dayCell.eventCount > 0
+            text: dayCell.dayEvents.map(ev => {
+                const hora = ev.allDay
+                    ? Translation.tr("Todo el día")
+                    : ev.start.toLocaleTimeString(Qt.locale(), "HH:mm");
+                return `${hora}  ${ev.summary}`;
+            }).join("\n") + "\n\n" + Translation.tr("Click para abrirlo en el navegador")
         }
     }
 
@@ -207,6 +281,28 @@ AbstractBackgroundWidget {
                             font.weight: Font.Bold
                             color: Appearance.colors.colOnPrimaryContainer
                         }
+
+                        // Cuántos eventos hay hoy; sin eventos no ocupa nada.
+                        StyledText {
+                            anchors {
+                                horizontalCenter: parent.horizontalCenter
+                                bottom: parent.bottom
+                                bottomMargin: 8
+                            }
+                            visible: root.todayEvents.length > 0
+                            text: Translation.tr("%1 hoy").arg(root.todayEvents.length)
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            font.weight: Font.Medium
+                            color: Appearance.colors.colOnPrimaryContainer
+                            opacity: 0.7
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: root.todayEvents.length > 0
+                            cursorShape: root.todayEvents.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: Calendars.openDay(root.todayKey)
+                        }
                     }
                 }
             }
@@ -262,7 +358,9 @@ AbstractBackgroundWidget {
                     Repeater {
                         model: root.getCurrentWeek()
                         delegate: Item {
+                            id: weekCell
                             required property var modelData
+                            readonly property var cellEvents: Calendars.eventsOn(modelData.dateKey)
                             implicitWidth: (card.implicitWidth - 28) / 7
                             implicitHeight: 28
 
@@ -270,18 +368,54 @@ AbstractBackgroundWidget {
                                 anchors.centerIn: parent
                                 width: 28; height: 28
                                 radius: 14
-                                color: modelData.isToday ? Appearance.colors.colPrimary : "transparent"
+                                color: weekCell.modelData.isToday ? Appearance.colors.colPrimary : "transparent"
 
                                 StyledText {
                                     anchors.centerIn: parent
-                                    text: modelData.day
+                                    text: weekCell.modelData.day
                                     font.pixelSize: Appearance.font.pixelSize.smaller
-                                    font.weight: modelData.isToday ? Font.Bold : Font.Normal
-                                    color: modelData.isToday
+                                    font.weight: weekCell.modelData.isToday ? Font.Bold : Font.Normal
+                                    color: weekCell.modelData.isToday
                                         ? Appearance.colors.colOnPrimary
                                         : Appearance.colors.colOnPrimaryContainer
-                                    opacity: modelData.currentMonth ? 1.0 : 0.3
+                                    opacity: weekCell.modelData.currentMonth ? 1.0 : 0.3
                                 }
+
+                                // Un punto por evento, hasta tres.
+                                Row {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 3
+                                    spacing: 2
+                                    visible: weekCell.cellEvents.length > 0
+
+                                    Repeater {
+                                        model: Math.min(weekCell.cellEvents.length, 3)
+                                        delegate: Rectangle {
+                                            width: 3; height: 3; radius: 1.5
+                                            color: weekCell.modelData.isToday
+                                                ? Appearance.colors.colOnPrimary
+                                                : Appearance.colors.colOnPrimaryContainer
+                                        }
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: weekCell.cellEvents.length > 0
+                                cursorShape: weekCell.cellEvents.length > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: Calendars.openDay(weekCell.modelData.dateKey)
+                            }
+
+                            StyledToolTip {
+                                extraVisibleCondition: weekCell.cellEvents.length > 0
+                                text: weekCell.cellEvents.map(ev => {
+                                    const hora = ev.allDay
+                                        ? Translation.tr("Todo el día")
+                                        : ev.start.toLocaleTimeString(Qt.locale(), "HH:mm");
+                                    return `${hora}  ${ev.summary}`;
+                                }).join("\n") + "\n\n" + Translation.tr("Click para abrirlo en el navegador")
                             }
                         }
                     }
@@ -386,6 +520,7 @@ AbstractBackgroundWidget {
                                         day: modelData.day
                                         currentMonth: modelData.currentMonth
                                         isToday: modelData.isToday
+                                        dateKey: modelData.dateKey
                                     }
                                 }
                             }
@@ -403,7 +538,7 @@ AbstractBackgroundWidget {
             resizeMode: "diagonal"
             onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
             onResizeFinished: {
-                root.configEntry.sizeMode = root.sizeMode
+                root.writeOverride("sizeMode", root.sizeMode)
             }
         }
     }

@@ -206,6 +206,13 @@ ContentPage {
         }
 
         ContentSubsection {
+            title: Translation.tr("Mostrar en")
+            PerScreenEnableList {
+                configEntry: Config.options.background.widgets.clock
+            }
+        }
+
+        ContentSubsection {
             title: Translation.tr("Color del reloj")
 
             // Vacío = sigue la paleta del wallpaper; el switch es la forma de volver a eso
@@ -818,6 +825,13 @@ ContentPage {
                 ]
             }
         }
+
+        ContentSubsection {
+            title: Translation.tr("Mostrar en")
+            PerScreenEnableList {
+                configEntry: Config.options.background.widgets.weather
+            }
+        }
     }
 
     ContentSection {
@@ -862,6 +876,13 @@ ContentPage {
                         value: "mostBusy"
                     },
                 ]
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Mostrar en")
+            PerScreenEnableList {
+                configEntry: Config.options.background.widgets.calendar
             }
         }
     }
@@ -920,12 +941,23 @@ ContentPage {
                 },
             ]
         }
+
+        ContentSubsection {
+            title: Translation.tr("Mostrar en")
+            PerScreenEnableList {
+                configEntry: Config.options.background.widgets.resources
+            }
+        }
     }
 
     /**
      * Estos widgets ya viven en el escritorio (Background.qml los instancia) pero hasta
      * ahora sólo se prendían desde el click derecho. Acá van sólo los interruptores:
      * la posición y el tamaño se ajustan arrastrándolos.
+     *
+     * Bajo cada uno, la misma lista de monitores que en las secciones de arriba: sin
+     * marcar ninguno el widget sigue el switch de "Enable" en todas las pantallas;
+     * destildar una la apaga sólo ahí, para tener widgets distintos por monitor.
      */
     ContentSection {
         icon: "dashboard_customize"
@@ -939,6 +971,9 @@ ContentPage {
                 Config.options.background.widgets.media.enable = checked;
             }
         }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.media
+        }
 
         ConfigSwitch {
             buttonIcon: "graphic_eq"
@@ -947,6 +982,9 @@ ContentPage {
             onCheckedChanged: {
                 Config.options.background.widgets.visualizer.enable = checked;
             }
+        }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.visualizer
         }
 
         ConfigSwitch {
@@ -957,6 +995,9 @@ ContentPage {
                 Config.options.background.widgets.userCard.enable = checked;
             }
         }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.userCard
+        }
 
         ConfigSwitch {
             buttonIcon: "public"
@@ -966,6 +1007,9 @@ ContentPage {
                 Config.options.background.widgets.worldClock.enable = checked;
             }
         }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.worldClock
+        }
 
         ConfigSwitch {
             buttonIcon: "note_stack_add"
@@ -974,6 +1018,9 @@ ContentPage {
             onCheckedChanged: {
                 Config.options.background.widgets.notes.enable = checked;
             }
+        }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.notes
         }
 
         // La imagen se elige desde el propio widget (arrastrándola o con el selector);
@@ -985,6 +1032,9 @@ ContentPage {
             onCheckedChanged: {
                 Config.options.background.widgets.customImage.enable = checked;
             }
+        }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.customImage
         }
 
         ContentSubsection {
@@ -1010,6 +1060,9 @@ ContentPage {
             onCheckedChanged: {
                 Config.options.background.widgets.images.enable = checked;
             }
+        }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.images
         }
     }
 

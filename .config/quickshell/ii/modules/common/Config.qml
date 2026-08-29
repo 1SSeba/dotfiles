@@ -310,6 +310,15 @@ Singleton {
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
+                        /**
+                         * Overrides por pantalla, para tener un widget distinto (o distinta
+                         * posición/tamaño) en cada monitor. Forma: { "<nombre>": { enable, x, y,
+                         * sizeMode?, vertical? } }. El nombre de pantalla sale de 'hyprctl monitors'.
+                         * Una pantalla sin entrada acá hereda enable/x/y/sizeMode de arriba, como
+                         * pasaba siempre; arrastrar o redimensionar el widget en una pantalla crea
+                         * su entrada sin tocar las demás.
+                         */
+                        property var screens: ({})
                         property string style: "cookie"        // Options: "cookie", "digital", "pixel"
                         // Color del reloj del fondo ("" = el del tema)
                         property string color: ""
@@ -357,6 +366,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "1x3"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
 
                     property JsonObject calendar: JsonObject {
@@ -365,6 +375,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "2x2"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject resources: JsonObject {
                         property bool enable: false
@@ -372,6 +383,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property bool vertical: false
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject userCard: JsonObject {
                         property bool enable: false
@@ -379,6 +391,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "1x2"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject media: JsonObject {
                         property bool enable: false
@@ -390,12 +403,14 @@ Singleton {
                         property real x: 800
                         property real y: 500
                         property string sizeMode: "1x3"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject visualizer: JsonObject {
                         property bool enable: false
                         property string placementStrategy: "free"
                         property real x: 0
                         property real y: 0
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject customImage: JsonObject {
                         property bool enable: false
@@ -405,12 +420,14 @@ Singleton {
                         property string path: ""
                         property string shape: "Cookie4Sided"
                         property real size: 200
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject images: JsonObject {
                         property bool enable: false
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject notes: JsonObject {
                         property bool enable: false
@@ -418,6 +435,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "2x2"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                     property JsonObject worldClock: JsonObject {
                         property bool enable: false
@@ -426,6 +444,7 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "2x2"
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
                 }
                 property string wallpaperPath: ""
