@@ -446,6 +446,16 @@ Singleton {
                         property string sizeMode: "2x2"
                         property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
                     }
+                    // Tareas pendientes: locales + Google Tasks + Apple Reminders
+                    // (Todo.qml ya las mezcla; ver services/GoogleTasks.qml y
+                    // services/AppleReminders.qml, y Settings > Cuentas para conectarlas).
+                    property JsonObject tasks: JsonObject {
+                        property bool enable: false
+                        property string placementStrategy: "free"
+                        property real x: 400
+                        property real y: 100
+                        property var screens: ({}) // Overrides por pantalla, ver comentario en 'clock'
+                    }
                 }
                 property string wallpaperPath: ""
                 // Previsualizar el wallpaper al pasar el mouse por el selector

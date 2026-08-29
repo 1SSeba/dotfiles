@@ -1023,6 +1023,21 @@ ContentPage {
             configEntry: Config.options.background.widgets.notes
         }
 
+        // Local + Google Tasks + Apple Reminders, mezclados por Todo.qml. Para que
+        // aparezcan las de la nube hay que conectar la cuenta en Settings > Cuentas
+        // y prender "services.google.tasks"/"services.apple.reminders" ahí mismo.
+        ConfigSwitch {
+            buttonIcon: "checklist"
+            text: Translation.tr("Tareas")
+            checked: Config.options.background.widgets.tasks.enable
+            onCheckedChanged: {
+                Config.options.background.widgets.tasks.enable = checked;
+            }
+        }
+        PerScreenEnableList {
+            configEntry: Config.options.background.widgets.tasks
+        }
+
         // La imagen se elige desde el propio widget (arrastrándola o con el selector);
         // la forma del recorte sólo se puede cambiar desde acá.
         ConfigSwitch {

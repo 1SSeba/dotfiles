@@ -25,6 +25,7 @@ import qs.modules.ii.background.widgets.visualizer
 import qs.modules.ii.background.widgets.images
 import qs.modules.ii.background.widgets.notes
 import qs.modules.ii.background.widgets.worldclock
+import qs.modules.ii.background.widgets.tasks
 
 Variants {
     id: root
@@ -784,6 +785,18 @@ Variants {
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
                         wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
+                    }
+                }
+
+                FadeLoader {
+                    shown: root.widgetEnabledOn(Config.options.background.widgets.tasks, bgRoot.screen?.name ?? "") && bgRoot.widgetsOnThisScreen
+                    sourceComponent: TasksWidget {
+                        screenName: bgRoot.screen?.name ?? ""
+                        screenWidth: bgRoot.screen.width
+                        screenHeight: bgRoot.screen.height
+                        scaledScreenWidth: bgRoot.screen.width
+                        scaledScreenHeight: bgRoot.screen.height
+                        wallpaperScale: 1
                     }
                 }
             }
