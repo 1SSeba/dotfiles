@@ -442,6 +442,33 @@ AbstractBackgroundWidget {
                         font.weight: Font.Medium
                         color: Appearance.colors.colOnPrimaryContainer
                         text: root.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+
+                        MouseArea {
+                            anchors.fill: parent
+                            visible: root.monthShift !== 0
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.monthShift = 0
+                        }
+                    }
+
+                    // Año anterior/siguiente, de a 12 meses -- para no tener que
+                    // apretar la flecha de mes 12 veces para moverte de año.
+                    Rectangle {
+                        implicitWidth: 26; implicitHeight: 26; radius: 13
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Appearance.colors.colPrimary
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "keyboard_double_arrow_left"
+                            iconSize: Appearance.font.pixelSize.small
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.monthShift -= 12
+                        }
                     }
 
                     Rectangle {
@@ -477,6 +504,24 @@ AbstractBackgroundWidget {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.monthShift++
+                        }
+                    }
+
+                    Rectangle {
+                        implicitWidth: 26; implicitHeight: 26; radius: 13
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Appearance.colors.colPrimary
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "keyboard_double_arrow_right"
+                            iconSize: Appearance.font.pixelSize.small
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.monthShift += 12
                         }
                     }
                 }
