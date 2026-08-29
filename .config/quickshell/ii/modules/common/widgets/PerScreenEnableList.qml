@@ -26,12 +26,13 @@ ColumnLayout {
     spacing: 2
 
     function isOverriddenOff(monitorName) {
-        return root.configEntry.screens?.[monitorName]?.enable === false;
+        return root.configEntry?.screens?.[monitorName]?.enable === false;
     }
 
     function setOverriddenOff(monitorName, off) {
-        const screens = Object.assign({}, root.configEntry.screens ?? {});
-        const entry = Object.assign({}, screens[monitorName] ?? {});
+        if (!root.configEntry) return;
+        const screens = Object.assign({}, root.configEntry.screens || {});
+        const entry = Object.assign({}, screens[monitorName] || {});
         if (off) {
             entry.enable = false;
         } else {

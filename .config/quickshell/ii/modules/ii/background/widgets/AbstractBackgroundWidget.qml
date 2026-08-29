@@ -23,19 +23,36 @@ AbstractWidget {
 
     // ---- Overrides por pantalla ----
     // El override de esta pantalla en particular, o {} si nunca se customizó acá.
-    readonly property var screenOverride: (root.configEntry.screens && root.configEntry.screens[root.screenName]) || ({})
+    // Todo con `?.`/`try` a propósito: si `Config` quedó con una versión vieja del
+    // singleton (pasa con el hot-reload de Quickshell, que no siempre reinstancia
+    // los `pragma Singleton`), `configEntry.screens` puede no existir todavía. Que
+    // "sin overrides" sea siempre el resultado seguro, nunca una excepción -- una
+    // excepción acá tira placementStrategy/x/y a `undefined` y con eso el widget
+    // deja de ser arrastrable.
+    readonly property var screenOverride: {
+        try {
+            const screens = root.configEntry?.screens;
+            return (screens && screens[root.screenName]) || ({});
+        } catch (e) {
+            return ({});
+        }
+    }
     /** El valor de 'key' para esta pantalla: el override si existe, si no el global. */
     function effective(key) {
-        const own = root.screenOverride[key];
+        const own = root.screenOverride?.[key];
         return own !== undefined ? own : root.configEntry[key];
     }
     /** Guarda 'key' como override propio de esta pantalla, sin tocar las demás. */
     function writeOverride(key, value) {
-        const screens = Object.assign({}, root.configEntry.screens ?? {});
-        const entry = Object.assign({}, screens[root.screenName] ?? {});
-        entry[key] = value;
-        screens[root.screenName] = entry;
-        root.configEntry.screens = screens;
+        try {
+            const screens = Object.assign({}, root.configEntry.screens || {});
+            const entry = Object.assign({}, screens[root.screenName] || {});
+            entry[key] = value;
+            screens[root.screenName] = entry;
+            root.configEntry.screens = screens;
+        } catch (e) {
+            console.warn("[Background] No se pudo guardar el override de pantalla:", e);
+        }
     }
 
     property string placementStrategy: root.effective("placementStrategy")

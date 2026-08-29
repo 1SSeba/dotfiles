@@ -78,8 +78,12 @@ Variants {
      * en una pantalla puntual, sin tocar las demás.
      */
     function widgetEnabledOn(entry, screenName) {
-        const override = entry.screens?.[screenName]?.enable;
-        return override !== undefined ? override : entry.enable;
+        try {
+            const override = entry?.screens?.[screenName]?.enable;
+            return override !== undefined ? override : (entry?.enable ?? false);
+        } catch (e) {
+            return entry?.enable ?? false;
+        }
     }
 
     function getColorFromName(name) {
