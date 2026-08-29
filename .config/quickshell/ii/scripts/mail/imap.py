@@ -26,7 +26,13 @@ marcaria los mensajes como leidos — el widget te vaciaria la bandeja solo.
 
 Salida: un JSON por stdout.
     {"ok": true, "unread": 3, "messages": [{"from":..., "subject":..., "date":...}]}
-    {"ok": false, "error": "texto"}
+    {"ok": false, "error": "texto", "kind": "auth" | "network" | "config" | "unknown"}
+
+`kind` es para que el lado QML (MailService.qml) sepa si vale la pena
+reintentar solo (network: un corte de red, un timeout) o si hace falta que
+el usuario reconecte la cuenta a mano (auth: la contrasenia de aplicacion
+dejo de servir, o nunca fue una). Reintentar auth en loop no arregla nada y
+solo le pega al servidor.
 
 Uso: imap.py HOST PUERTO USUARIO [BUZON] [MAX_MENSAJES] [SEGURIDAD]
      SEGURIDAD: ssl (por defecto) | starttls
@@ -144,7 +150,7 @@ def main():
 
     password = os.environ.get("MAIL_PASSWORD", "")
     if not password:
-        emit({"ok": False, "error": "Falta la contrasenia de aplicacion"})
+        emit({"ok": False, "error": "Falta la contrasenia de aplicacion", "kind": "config"})
         return 1
 
     conn = None
@@ -184,14 +190,17 @@ def main():
         return 0
 
     except imaplib.IMAP4.error as exc:
-        # El caso tipico: contrasenia normal en vez de contrasenia de aplicacion
-        emit({"ok": False, "error": "El servidor rechazo el login: %s" % exc})
+        # El caso tipico: contrasenia normal en vez de contrasenia de aplicacion,
+        # o una contrasenia de aplicacion que Google/Apple ya revoco. No se
+        # arregla solo: reintentar en loop no sirve de nada.
+        emit({"ok": False, "error": "El servidor rechazo el login: %s" % exc, "kind": "auth"})
         return 1
     except (OSError, ssl.SSLError) as exc:
-        emit({"ok": False, "error": "No se pudo conectar a %s: %s" % (host, exc)})
+        # Corte de red, DNS, timeout: pasajero. Vale la pena reintentar pronto.
+        emit({"ok": False, "error": "No se pudo conectar a %s: %s" % (host, exc), "kind": "network"})
         return 1
     except Exception as exc:  # noqa: BLE001
-        emit({"ok": False, "error": str(exc)})
+        emit({"ok": False, "error": str(exc), "kind": "unknown"})
         return 1
     finally:
         close_quietly(conn)

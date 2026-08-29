@@ -112,6 +112,8 @@ Singleton {
         const copia = Object.assign({}, root.results);
         delete copia[String(id)];
         root.results = copia;
+        root.setReauth(String(id), false);
+        root.clearRetry(String(id));
     }
 
     /**
@@ -251,6 +253,10 @@ Singleton {
                             "enable": true
                         }));
                         root.setAppPassword(id, creds.password);
+                        // Cuenta reconectada a mano: lo que sabíamos de fallas viejas
+                        // (reauth, backoff) ya no aplica, aunque sea la misma id.
+                        root.setReauth(id, false);
+                        root.clearRetry(id);
                         root.connectState = "idle";
                         root.connecting = "";
                         Qt.callLater(() => root.refresh());
@@ -300,8 +306,32 @@ Singleton {
         return todos.sort((a, b) => b.timestamp - a.timestamp).slice(0, root.maxMessages);
     }
 
+    /**
+     * Cuentas cuya contraseña de aplicación dejó de servir: { id: true }. No se
+     * arreglan reintentando -- necesitan que el usuario reconecte a mano desde
+     * Ajustes → Perfil → Cuentas → Correo. Se limpia sólo con un fetch exitoso o
+     * al reconectar.
+     */
+    property var needsReauth: ({})
+    readonly property bool anyNeedsReauth: Object.keys(root.needsReauth).some(id => root.needsReauth[id])
+
+    function setReauth(accountId, value) {
+        const already = root.needsReauth[accountId] === true;
+        if (already === Boolean(value)) return;
+        const copia = Object.assign({}, root.needsReauth);
+        if (value) copia[accountId] = true;
+        else delete copia[accountId];
+        root.needsReauth = copia;
+    }
+
     /** Se muestra un error solo: apilar todos no ayuda a entender nada. */
     readonly property string lastError: {
+        // Reconectar es lo único que el usuario puede arreglar de verdad;
+        // un corte transitorio se resuelve solo y no vale la pena alarmar por eso.
+        for (const account of root.accounts) {
+            if (root.needsReauth[account.id])
+                return Translation.tr("La contraseña de aplicación de %1 dejó de servir. Reconectala desde Ajustes.").arg(account.label);
+        }
         for (const account of root.accounts) {
             const error = root.results[account.id]?.error ?? "";
             if (error.length > 0) {
@@ -355,6 +385,66 @@ Singleton {
     /** Si el proceso terminó sin haber impreso nada, murió antes de poder hablar. */
     property bool answered: false
 
+    // ------------------------------------------------------------------ //
+    // Reintentos
+    // ------------------------------------------------------------------ //
+    // Un corte de red no debería obligar a esperar hasta el próximo refresh
+    // programado (5 min por defecto): eso es lo que hace que una conexión por
+    // polling se sienta "que se corta". Un fallo de red agenda un reintento
+    // propio, cada vez más espaciado, y una consulta exitosa lo resetea.
+
+    /** id -> cuántos reintentos van, para calcular el próximo delay. */
+    property var retryAttempt: ({})
+    /**
+     * id -> epoch del próximo reintento agendado. Un timestamp por cuenta y no
+     * un Timer por cuenta: con dos cuentas fallando cerca en el tiempo, un solo
+     * Timer compartido se pisa (la segunda cancela el reintento de la primera).
+     * Esto no tiene ese problema.
+     */
+    property var retryAt: ({})
+
+    function clearRetry(accountId) {
+        if (root.retryAttempt[accountId] === undefined && root.retryAt[accountId] === undefined) return;
+        const attempts = Object.assign({}, root.retryAttempt);
+        delete attempts[accountId];
+        root.retryAttempt = attempts;
+        const at = Object.assign({}, root.retryAt);
+        delete at[accountId];
+        root.retryAt = at;
+    }
+
+    function scheduleRetry(accountId) {
+        const attempt = (root.retryAttempt[accountId] ?? 0) + 1;
+        const attempts = Object.assign({}, root.retryAttempt);
+        attempts[accountId] = attempt;
+        root.retryAttempt = attempts;
+        // 15s, 30s, 60s, 120s, tope ahí: ni tan rápido como para hostigar al
+        // servidor, ni tan lento como para hacerte esperar el intervalo entero.
+        const delaySeconds = Math.min(120, 15 * Math.pow(2, attempt - 1));
+        const at = Object.assign({}, root.retryAt);
+        at[accountId] = Date.now() + delaySeconds * 1000;
+        root.retryAt = at;
+    }
+
+    /** Cada 5s se fija si algún reintento agendado ya venció y lo dispara. */
+    Timer {
+        interval: 5000
+        running: root.enabled
+        repeat: true
+        onTriggered: {
+            if (root.current !== null) return; // ya hay una consulta en curso
+            const now = Date.now();
+            const dueId = Object.keys(root.retryAt).find(id => root.retryAt[id] <= now);
+            if (!dueId) return;
+            root.clearRetry(dueId);
+            const account = root.accounts.find(a => a.id === dueId);
+            if (!account) return; // se borró o se apagó mientras esperaba
+            root.queue = root.queue.concat([account]);
+            root.loading = true;
+            root.pump();
+        }
+    }
+
     function refresh() {
         if (!root.enabled || root.loading) return;
         root.queue = root.accounts.slice(0);
@@ -394,19 +484,34 @@ Singleton {
                     const data = JSON.parse(line);
                     if (!data.ok) {
                         const message = data.error ?? Translation.tr("Error desconocido");
-                        root.patchResult(account.id, ({ "error": message }));
+                        const kind = data.kind ?? "unknown";
+                        root.patchResult(account.id, ({ "error": message, "errorKind": kind }));
                         console.log("[Mail]", account.label, message);
+                        if (kind === "auth") {
+                            // La contraseña dejó de servir: reintentar en loop no
+                            // arregla nada, sólo golpea al servidor. Que espere a
+                            // que reconecten a mano (o al próximo refresh normal,
+                            // por si era Google rechazando algo pasajero).
+                            root.setReauth(account.id, true);
+                            root.clearRetry(account.id);
+                        } else {
+                            root.scheduleRetry(account.id);
+                        }
                         return;
                     }
                     root.patchResult(account.id, ({
                         "unread": data.unread ?? 0,
                         "messages": data.messages ?? [],
                         "error": "",
+                        "errorKind": "",
                         "lastSync": Date.now()
                     }));
+                    root.setReauth(account.id, false);
+                    root.clearRetry(account.id);
                     AccountsCache.set("mail", root.results);
                 } catch (e) {
-                    root.patchResult(account.id, ({ "error": String(e) }));
+                    root.patchResult(account.id, ({ "error": String(e), "errorKind": "unknown" }));
+                    root.scheduleRetry(account.id);
                     console.log("[Mail] respuesta ilegible:", line);
                 }
             }
@@ -414,11 +519,14 @@ Singleton {
         onExited: exitCode => {
             const account = root.current;
             // El script escribe su propio error en stdout; un exit sin nada
-            // impreso es que se murió antes de poder decir nada
+            // impreso es que se murió antes de poder decir nada -- eso es un
+            // corte, no una credencial mala, así que vale la pena reintentar.
             if (account && !root.answered) {
                 root.patchResult(account.id, ({
-                    "error": Translation.tr("El lector de correo terminó con código %1").arg(exitCode)
+                    "error": Translation.tr("El lector de correo terminó con código %1").arg(exitCode),
+                    "errorKind": "network"
                 }));
+                root.scheduleRetry(account.id);
             }
             root.current = null;
             root.pump();
