@@ -223,6 +223,13 @@ Scope { // Scope
                         panelWindow.hide();
                     }
                     if (event.modifiers === Qt.ControlModifier) {
+                        // Si el foco está en un campo de texto (p. ej. el buscador de
+                        // Spotify), no interceptar: si no, escribir "Ctrl+D" ahí
+                        // desprende el sidebar entero a una ventana en vez de escribir.
+                        const focusedItem = panelWindow.activeFocusItem;
+                        if (focusedItem && typeof focusedItem.text === "string" && typeof focusedItem.selectAll === "function") {
+                            return;
+                        }
                         if (event.key === Qt.Key_O) {
                             panelWindow.extend = !panelWindow.extend;
                         } else if (event.key === Qt.Key_D) {
@@ -258,6 +265,12 @@ Scope { // Scope
 
                 Keys.onPressed: (event) => {
                     if (event.modifiers === Qt.ControlModifier) {
+                        // Mismo resguardo que en la versión anclada: no reaccionar si
+                        // se está escribiendo en un campo de texto.
+                        const focusedItem = detachedSidebarRoot.activeFocusItem;
+                        if (focusedItem && typeof focusedItem.text === "string" && typeof focusedItem.selectAll === "function") {
+                            return;
+                        }
                         if (event.key === Qt.Key_D) {
                             root.toggleDetach();
                         }
