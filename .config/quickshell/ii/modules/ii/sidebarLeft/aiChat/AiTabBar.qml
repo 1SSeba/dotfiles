@@ -177,6 +177,16 @@ ColumnLayout {
 
             StyledToolTip {
                 text: Translation.tr("Historial")
+                // El default de ToolTip lo abre ARRIBA del botón (y: -height-3);
+                // acá, pegado al borde de la sidebar, QtQuick Controls lo clampea
+                // para que no se salga de la ventana y termina superpuesto sobre
+                // el propio botón. Un Popup visible ahí come el primer press
+                // aunque closePolicy sea NoAutoClose — el botón se sentía muerto
+                // porque el tooltip se abre solo con el hover, ANTES de que
+                // llegue el click. Forzarlo para abajo le garantiza espacio
+                // propio y no vuelve a solaparse. Mismo bug (y mismo fix) que
+                // ScrollHint con ScrollControl.
+                y: historyButton.height + 6
             }
         }
 
@@ -203,6 +213,10 @@ ColumnLayout {
 
             StyledToolTip {
                 text: Translation.tr("Pestaña nueva (Ctrl+T)")
+                // Ver el comentario en el StyledToolTip de historyButton: mismo
+                // bug (el tooltip clampeado queda encima del botón y se come el
+                // click), mismo fix (forzarlo para abajo).
+                y: addButton.height + 6
             }
         }
     }
