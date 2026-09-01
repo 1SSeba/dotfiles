@@ -219,9 +219,12 @@ Scope { // Scope
                         Layout.bottomMargin: 8
                         Layout.rightMargin: 8
                         Layout.preferredWidth: GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth : 0
-                        // Sin esto el panel se sigue midiendo mientras el ancho está
-                        // en 0 y el layout interno tira warnings de ancho negativo.
-                        visible: width > 20
+                        // OJO: tiene que atarse a aiHistoryOpen, NO al width propio.
+                        // Un RowLayout excluye del layout a los items invisibles, así
+                        // que "visible: width > 20" era un candado circular: nunca
+                        // recibía ancho por estar invisible, y nunca era visible por
+                        // no tener ancho. El panel jamás llegaba a mostrarse.
+                        visible: GlobalStates.aiHistoryOpen
                         clip: true
 
                         Behavior on Layout.preferredWidth {
