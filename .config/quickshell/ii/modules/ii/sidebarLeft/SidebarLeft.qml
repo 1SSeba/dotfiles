@@ -106,12 +106,19 @@ Scope { // Scope
 
             /** Ancho del panel de historial cuando está incrustado en el sidebar. */
             readonly property real historyPanelWidth: 280
+            /** Separación entre el chat y el panel de historial (spacing del RowLayout). */
             readonly property real historyPanelGap: 8
+            /** Margen entre el panel de historial y los bordes del sidebar (arriba/abajo/derecha). */
+            readonly property real historyPanelEdgeMargin: 8
             // El historial ya no abre una superficie propia al lado: cuando está
             // abierto, es este mismo ancho el que le suma al panel para hacerle
-            // lugar adentro.
+            // lugar adentro. El gap y el margen se suman SIEMPRE, no sólo cuando
+            // está abierto: el panel de historial vive siempre adentro del
+            // RowLayout (para que cerrar anime tan suave como abrir, ver más
+            // abajo), así que ese espacio está reservado todo el tiempo.
             readonly property real totalWidth: panelWindow.sidebarWidth
-                + (GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth + panelWindow.historyPanelGap : 0)
+                + panelWindow.historyPanelGap + panelWindow.historyPanelEdgeMargin
+                + (GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth : 0)
 
             exclusionMode: ExclusionMode.Normal
             exclusiveZone: root.pin ? panelWindow.totalWidth : 0
@@ -119,7 +126,7 @@ Scope { // Scope
             // contenido se recorta con `mask`, pero si la ventana fuera más
             // angosta que extendido + historial, no habría dónde crecer.
             implicitWidth: panelWindow.extendedWidth + panelWindow.historyPanelWidth
-                + panelWindow.historyPanelGap + Appearance.sizes.elevationMargin
+                + panelWindow.historyPanelGap + panelWindow.historyPanelEdgeMargin + Appearance.sizes.elevationMargin
             WlrLayershell.namespace: "quickshell:sidebarLeft"
             // Hyprland 0.49: OnDemand is Exclusive, Exclusive just breaks click-outside-to-close
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -232,20 +239,45 @@ Scope { // Scope
                         // puede crecer acá es lo que sobra del fondo (que ya se
                         // anima solo, ver `sidebarLeftBackground`), así que este
                         // panel sigue esa animación gratis, sin la suya propia.
+                        //
+                        // SIN `visible` acá: un RowLayout excluye del layout a los
+                        // items invisibles de un saque, sin animar. Con
+                        // "visible: aiHistoryOpen" el panel abría suave (porque ya
+                        // estaba adentro del layout cuando el ancho empezaba a
+                        // crecer) pero cerraba de un salto (desaparecía instantáneo
+                        // ANTES de que el fondo terminara de encogerse). Dejándolo
+                        // siempre adentro del layout, su ancho fillWidth baja a 0
+                        // solo, seguido a la MISMA animación que ya tiene el fondo.
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.topMargin: 8
-                        Layout.bottomMargin: 8
-                        Layout.rightMargin: 8
-                        // Atado a aiHistoryOpen, NO al width propio: un RowLayout
-                        // excluye del layout a los items invisibles, así que
-                        // "visible: width > 20" era un candado circular (nunca
-                        // recibía ancho por estar invisible, nunca era visible por
-                        // no tener ancho) y el panel jamás llegaba a mostrarse.
-                        visible: GlobalStates.aiHistoryOpen
+                        Layout.topMargin: panelWindow.historyPanelEdgeMargin
+                        Layout.bottomMargin: panelWindow.historyPanelEdgeMargin
+                        // El rightMargin también hay que contarlo en totalWidth (ver
+                        // arriba): si no, el ancho quedaba corto en exactamente estos
+                        // px y todo el cálculo se desalineaba de nuevo.
+                        Layout.rightMargin: panelWindow.historyPanelEdgeMargin
                         clip: true
 
                         onRequestClose: GlobalStates.aiHistoryOpen = false
+                    }
+
+                    // AiHistoryPanel ya no alterna su propio `visible` con
+                    // aiHistoryOpen (ver comentario arriba), así que perdió el
+                    // onVisibleChanged que refrescaba la lista al abrir y limpiaba
+                    // el estado transitorio (menú expandido, renombrar, proyecto
+                    // nuevo) al cerrar. Lo reponemos acá, atado directamente al
+                    // estado real en vez de al ancho.
+                    Connections {
+                        target: GlobalStates
+                        function onAiHistoryOpenChanged() {
+                            if (GlobalStates.aiHistoryOpen) {
+                                AiHistory.refresh();
+                            } else {
+                                embeddedHistoryPanel.expandedChat = "";
+                                embeddedHistoryPanel.renamingChat = "";
+                                embeddedHistoryPanel.creatingProject = false;
+                            }
+                        }
                     }
                 }
             }
