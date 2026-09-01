@@ -688,20 +688,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
 
             // Chip al final de la lista para cargar un modelo custom sin tocar
-            // el config a mano (ver AiAddModelForm).
+            // el config a mano (ver AiAddModelForm, ahora un modal — el Loader
+            // que lo hostea vive al final del archivo, junto al de
+            // AiNewChatDialog).
             showAddOption: true
             addLabel: Translation.tr("Agregar modelo")
             onAddRequested: root.openPicker = "addModel"
-        }
-
-        AiAddModelForm {
-            Layout.fillWidth: true
-            // Comparte el mismo interruptor que model/effort/tool: así, si
-            // abrís otro picker mientras este formulario está desplegado, se
-            // cierra solo (openPicker deja de valer "addModel") sin tener que
-            // acordarse de resetear un estado aparte.
-            open: root.openPicker === "addModel"
-            onClosed: root.openPicker = ""
         }
 
         AiOptionPicker { // Esfuerzo de Claude Code
@@ -1165,6 +1157,19 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 Ai.newSession(agentId);
                 root.showNewChatDialog = false;
             }
+        }
+    }
+
+    // Modal para cargar un modelo custom (ver AiAddModelForm). Antes era un
+    // panel que se desplegaba inline abajo del selector de modelos; ahora es
+    // un modal de verdad, mismo patrón que el de arriba.
+    Loader {
+        anchors.fill: parent
+        active: root.openPicker === "addModel"
+        visible: root.openPicker === "addModel"
+        z: 9999
+        sourceComponent: AiAddModelForm {
+            onClosed: root.openPicker = ""
         }
     }
 }
