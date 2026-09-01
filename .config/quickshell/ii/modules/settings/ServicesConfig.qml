@@ -8,18 +8,250 @@ ContentPage {
     forceWidth: true
 
     ContentSection {
+        id: aiSection
         icon: "neurology"
         title: Translation.tr("AI")
 
-        MaterialTextArea {
-            Layout.fillWidth: true
-            placeholderText: Translation.tr("System prompt")
-            text: Config.options.ai.systemPrompt
-            wrapMode: TextEdit.Wrap
-            onTextChanged: {
-                Qt.callLater(() => {
-                    Config.options.ai.systemPrompt = text;
-                });
+        /** ¿Ya hay algún modelo con este api_format? (para no duplicar al "agregar modelos"). */
+        function hasProviderModel(apiFormat) {
+            return Ai.modelList.some(id => Ai.models[id]?.api_format === apiFormat);
+        }
+
+        /** Suma entries a extraModels (persistido) + Ai.addModel (en caliente), sin duplicar por id. */
+        function seedModels(entries) {
+            const existingIds = new Set((Config.options.ai.extraModels ?? []).map(m => m.id ?? m.model));
+            const newEntries = entries.filter(e => !existingIds.has(e.id));
+            if (newEntries.length === 0) return;
+            Config.options.ai.extraModels = [...(Config.options.ai.extraModels ?? []), ...newEntries];
+            newEntries.forEach(e => Ai.addModel(Ai.safeModelName(e.id), e));
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Proveedores")
+            tooltip: Translation.tr("Conectá los tres motores más comunes en un toque.\nPara cualquier otro (OpenRouter, Ollama, un endpoint propio...), sumalo desde el chat con el botón \"+\" del selector de modelos.")
+
+            // ---------------------------------------------------------- Claude Code
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    MaterialSymbol {
+                        text: "terminal"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: "Claude Code"
+                        font.pixelSize: Appearance.font.pixelSize.normal
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        text: Ai.claudeCodeVersion.length > 0
+                            ? Translation.tr("✅ %1").arg(Ai.claudeCodeVersion)
+                            : Translation.tr("❌ no encontrado")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                    }
+                }
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: Ai.claudeCodeVersion.length === 0
+                    text: Translation.tr("Sin API key: usa tu suscripción vía el CLI `claude`. Instalalo con:\ncurl -fsSL https://claude.ai/install.sh | bash")
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    wrapMode: Text.Wrap
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    RippleButtonWithIcon {
+                        materialIcon: "login"
+                        mainText: Translation.tr("Iniciar sesión")
+                        enabled: Ai.claudeCodeVersion.length > 0
+                        onClicked: Ai.loginProvider("claude")
+                    }
+                    RippleButtonWithIcon {
+                        materialIcon: "add_circle"
+                        mainText: Translation.tr("Agregar modelos")
+                        visible: !aiSection.hasProviderModel("claudecode")
+                        onClicked: {
+                            // Alias que el CLI ya entiende con --model: no hace falta el
+                            // id completo del modelo.
+                            // Sin "icon": ese campo en un modelo se usa como nombre de
+                            // asset (CustomIcon), no como Material Symbol — a
+                            // diferencia de los agentes. No hay ícono de Anthropic
+                            // en assets/icons, así que agregarlo tiraría el mismo
+                            // warning de "Cannot open: assets/icons/..." que ya se
+                            // evita en AiOptionPicker.qml. Sin ícono, el selector
+                            // muestra sólo el nombre — no rompe nada.
+                            aiSection.seedModels([
+                                { "id": "claude-haiku", "name": "Claude Haiku", "model": "haiku", "api_format": "claudecode", "requires_key": false },
+                                { "id": "claude-sonnet", "name": "Claude Sonnet", "model": "sonnet", "api_format": "claudecode", "requires_key": false },
+                                { "id": "claude-opus", "name": "Claude Opus", "model": "opus", "api_format": "claudecode", "requires_key": false },
+                            ]);
+                        }
+                        StyledToolTip {
+                            text: Translation.tr("Suma Haiku, Sonnet y Opus al selector de modelos")
+                        }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------- Gemini
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    CustomIcon {
+                        width: Appearance.font.pixelSize.larger
+                        height: Appearance.font.pixelSize.larger
+                        source: "google-gemini-symbolic"
+                        colorize: true
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: "Gemini"
+                        font.pixelSize: Appearance.font.pixelSize.normal
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        text: (Ai.apiKeys["gemini"] ?? "").length > 0
+                            ? Translation.tr("✅ %1").arg(Ai.maskKey(Ai.apiKeys["gemini"]))
+                            : Translation.tr("❌ sin key")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    MaterialTextField {
+                        id: geminiKeyField
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Pegá tu API key de Gemini")
+                        echoMode: TextInput.Password
+                    }
+                    RippleButtonWithIcon {
+                        materialIcon: "save"
+                        mainText: Translation.tr("Guardar")
+                        enabled: geminiKeyField.text.trim().length > 0
+                        onClicked: {
+                            KeyringStorage.setNestedField(["apiKeys", "gemini"], geminiKeyField.text.trim());
+                            geminiKeyField.text = "";
+                        }
+                    }
+                    RippleButtonWithIcon {
+                        materialIcon: "open_in_new"
+                        mainText: Translation.tr("Conseguir key")
+                        onClicked: Qt.openUrlExternally("https://aistudio.google.com/app/apikey")
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------- OpenAI
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    CustomIcon {
+                        width: Appearance.font.pixelSize.larger
+                        height: Appearance.font.pixelSize.larger
+                        source: "openai-symbolic"
+                        colorize: true
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: "OpenAI"
+                        font.pixelSize: Appearance.font.pixelSize.normal
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledText {
+                        text: (Ai.apiKeys["openai"] ?? "").length > 0
+                            ? Translation.tr("✅ %1").arg(Ai.maskKey(Ai.apiKeys["openai"]))
+                            : Translation.tr("❌ sin key")
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    MaterialTextField {
+                        id: openaiKeyField
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Pegá tu API key de OpenAI")
+                        echoMode: TextInput.Password
+                    }
+                    RippleButtonWithIcon {
+                        materialIcon: "save"
+                        mainText: Translation.tr("Guardar")
+                        enabled: openaiKeyField.text.trim().length > 0
+                        onClicked: {
+                            KeyringStorage.setNestedField(["apiKeys", "openai"], openaiKeyField.text.trim());
+                            openaiKeyField.text = "";
+                        }
+                    }
+                    RippleButtonWithIcon {
+                        materialIcon: "open_in_new"
+                        mainText: Translation.tr("Conseguir key")
+                        onClicked: Qt.openUrlExternally("https://platform.openai.com/api-keys")
+                    }
+                }
+
+                RippleButtonWithIcon {
+                    materialIcon: "add_circle"
+                    mainText: Translation.tr("Agregar modelo (gpt-4o-mini)")
+                    // No usamos hasProviderModel("openai") acá: "openai" es también
+                    // el api_format por default de CUALQUIER modelo custom (ver el
+                    // comentario junto a `models` en Ai.qml), así que un modelo
+                    // custom sin relación con OpenAI real ya haría desaparecer este
+                    // botón. Nos fijamos por key_id en vez de por api_format.
+                    visible: !Ai.modelList.some(id => Ai.models[id]?.key_id === "openai")
+                    onClicked: {
+                        aiSection.seedModels([
+                            { "id": "gpt-4o-mini", "name": "GPT-4o mini", "icon": "openai-symbolic",
+                              "model": "gpt-4o-mini", "endpoint": "https://api.openai.com/v1/chat/completions",
+                              "api_format": "openai", "requires_key": true, "key_id": "openai" },
+                        ]);
+                    }
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("System prompt")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("System prompt")
+                text: Config.options.ai.systemPrompt
+                wrapMode: TextEdit.Wrap
+                onTextChanged: {
+                    Qt.callLater(() => {
+                        Config.options.ai.systemPrompt = text;
+                    });
+                }
             }
         }
     }
