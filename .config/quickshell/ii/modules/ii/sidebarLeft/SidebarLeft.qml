@@ -106,19 +106,24 @@ Scope { // Scope
 
             /** Ancho del panel de historial cuando está incrustado en el sidebar. */
             readonly property real historyPanelWidth: 280
-            /** Separación entre el chat y el panel de historial (spacing del RowLayout). */
+            /** Separación entre el chat y el panel de historial. */
             readonly property real historyPanelGap: 8
             /** Margen entre el panel de historial y los bordes del sidebar (arriba/abajo/derecha). */
             readonly property real historyPanelEdgeMargin: 8
             // El historial ya no abre una superficie propia al lado: cuando está
             // abierto, es este mismo ancho el que le suma al panel para hacerle
-            // lugar adentro. El gap y el margen se suman SIEMPRE, no sólo cuando
-            // está abierto: el panel de historial vive siempre adentro del
-            // RowLayout (para que cerrar anime tan suave como abrir, ver más
-            // abajo), así que ese espacio está reservado todo el tiempo.
+            // lugar adentro. Vuelve a ser condicional (sólo suma con el
+            // historial abierto): reservarlo siempre dejaba el sidebar 16px más
+            // ancho que antes de esta feature INCLUSO CERRADO — todo se veía
+            // corrido hacia la izquierda contra un panel más ancho de lo que
+            // debía. El gap y el margen ahora viven como anchors.margins
+            // ADENTRO del panel (ver el wrapper más abajo), no como espacio
+            // reservado en el RowLayout, así que sólo existen cuando el panel
+            // realmente tiene ancho.
             readonly property real totalWidth: panelWindow.sidebarWidth
-                + panelWindow.historyPanelGap + panelWindow.historyPanelEdgeMargin
-                + (GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth : 0)
+                + (GlobalStates.aiHistoryOpen
+                    ? panelWindow.historyPanelWidth + panelWindow.historyPanelGap + panelWindow.historyPanelEdgeMargin
+                    : 0)
 
             exclusionMode: ExclusionMode.Normal
             exclusiveZone: root.pin ? panelWindow.totalWidth : 0
@@ -207,7 +212,13 @@ Scope { // Scope
 
                 RowLayout {
                     anchors.fill: parent
-                    spacing: panelWindow.historyPanelGap
+                    // SIN spacing acá: un RowLayout reserva `spacing` entre sus dos
+                    // columnas TODO el tiempo, aunque una tenga ancho 0. Terminaba
+                    // sumando 16px permanentes al sidebar incluso con el historial
+                    // cerrado (ver `totalWidth` arriba). El gap y los márgenes ahora
+                    // viven como anchors.margins ADENTRO del wrapper de más abajo,
+                    // no como espacio reservado en el layout.
+                    spacing: 0
 
                     // El contenido normal del sidebar (pestañas, chat, etc.) vive
                     // acá adentro; `contentParent` apunta a este Item en vez de a
@@ -232,41 +243,43 @@ Scope { // Scope
                         }
                     }
 
-                    AiHistoryPanel {
-                        id: embeddedHistoryPanel
-                        // fillWidth en vez de un ancho propio animado: como el área
-                        // de contenido de al lado ya tiene ancho fijo, lo único que
-                        // puede crecer acá es lo que sobra del fondo (que ya se
-                        // anima solo, ver `sidebarLeftBackground`), así que este
-                        // panel sigue esa animación gratis, sin la suya propia.
-                        //
-                        // SIN `visible` acá: un RowLayout excluye del layout a los
-                        // items invisibles de un saque, sin animar. Con
-                        // "visible: aiHistoryOpen" el panel abría suave (porque ya
-                        // estaba adentro del layout cuando el ancho empezaba a
-                        // crecer) pero cerraba de un salto (desaparecía instantáneo
-                        // ANTES de que el fondo terminara de encogerse). Dejándolo
-                        // siempre adentro del layout, su ancho fillWidth baja a 0
-                        // solo, seguido a la MISMA animación que ya tiene el fondo.
+                    // Envoltorio SIN Layout.margins propios: fillWidth puro, así que
+                    // cuando el historial está cerrado mide exactamente 0 y no le
+                    // suma nada al sidebar (a diferencia de antes, que con
+                    // Layout.rightMargin fijo esos 8px quedaban reservados siempre).
+                    // El gap con el chat y el margen contra los bordes van adentro,
+                    // como anchors.margins de AiHistoryPanel contra ESTE Item — así
+                    // sólo existen cuando el wrapper realmente tiene ancho.
+                    Item {
+                        id: embeddedHistoryPanelWrapper
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.topMargin: panelWindow.historyPanelEdgeMargin
-                        Layout.bottomMargin: panelWindow.historyPanelEdgeMargin
-                        // El rightMargin también hay que contarlo en totalWidth (ver
-                        // arriba): si no, el ancho quedaba corto en exactamente estos
-                        // px y todo el cálculo se desalineaba de nuevo.
-                        Layout.rightMargin: panelWindow.historyPanelEdgeMargin
                         clip: true
 
-                        onRequestClose: GlobalStates.aiHistoryOpen = false
+                        AiHistoryPanel {
+                            id: embeddedHistoryPanel
+                            // anchors.fill en vez de un ancho propio animado: sigue
+                            // el ancho del wrapper cuadro a cuadro (que a su vez es
+                            // fillWidth sobre el ancho ya animado del fondo), sin
+                            // necesitar su propio Behavior — igual que el contenido
+                            // normal seguía a sidebarLeftBackground antes de que
+                            // existiera este RowLayout.
+                            anchors.fill: parent
+                            anchors.leftMargin: panelWindow.historyPanelGap
+                            anchors.topMargin: panelWindow.historyPanelEdgeMargin
+                            anchors.bottomMargin: panelWindow.historyPanelEdgeMargin
+                            anchors.rightMargin: panelWindow.historyPanelEdgeMargin
+
+                            onRequestClose: GlobalStates.aiHistoryOpen = false
+                        }
                     }
 
                     // AiHistoryPanel ya no alterna su propio `visible` con
-                    // aiHistoryOpen (ver comentario arriba), así que perdió el
-                    // onVisibleChanged que refrescaba la lista al abrir y limpiaba
-                    // el estado transitorio (menú expandido, renombrar, proyecto
-                    // nuevo) al cerrar. Lo reponemos acá, atado directamente al
-                    // estado real en vez de al ancho.
+                    // aiHistoryOpen (ver comentario en su definición), así que
+                    // perdió el onVisibleChanged que refrescaba la lista al abrir y
+                    // limpiaba el estado transitorio (menú expandido, renombrar,
+                    // proyecto nuevo) al cerrar. Lo reponemos acá, atado
+                    // directamente al estado real en vez de al ancho.
                     Connections {
                         target: GlobalStates
                         function onAiHistoryOpenChanged() {
