@@ -4,6 +4,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.sidebarLeft.aiChat
 import QtQuick
+import QtQuick.Layouts
 import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
@@ -97,23 +98,28 @@ Scope { // Scope
                 Config.options?.sidebar?.leftWidthExtended ?? Appearance.sizes.sidebarWidthExtended,
                 panelWindow.baseWidth)
             property real sidebarWidth: panelWindow.extend ? panelWindow.extendedWidth : panelWindow.baseWidth
-            property var contentParent: sidebarLeftBackground
+            property var contentParent: sidebarContentArea
 
             function hide() {
                 GlobalStates.sidebarLeftOpen = false
             }
 
-            exclusionMode: ExclusionMode.Normal
-            exclusiveZone: root.pin ? sidebarWidth : 0
-            // La ventana se dimensiona con el ancho MÁS grande de los dos: el
-            // contenido se recorta con `mask`, pero si la ventana fuera más
-            // angosta que el modo extendido, expandir no tendría dónde crecer.
-            /** Ancho de la barra de historial que se abre a la derecha. */
-            readonly property real historyBarWidth: 280
-            readonly property real historyBarGap: 8
+            /** Ancho del panel de historial cuando está incrustado en el sidebar. */
+            readonly property real historyPanelWidth: 280
+            readonly property real historyPanelGap: 8
+            // El historial ya no abre una superficie propia al lado: cuando está
+            // abierto, es este mismo ancho el que le suma al panel para hacerle
+            // lugar adentro.
+            readonly property real totalWidth: panelWindow.sidebarWidth
+                + (GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth + panelWindow.historyPanelGap : 0)
 
-            implicitWidth: panelWindow.extendedWidth + Appearance.sizes.elevationMargin
-                + panelWindow.historyBarWidth + panelWindow.historyBarGap
+            exclusionMode: ExclusionMode.Normal
+            exclusiveZone: root.pin ? panelWindow.totalWidth : 0
+            // La ventana se dimensiona con el ancho MÁS grande de los posibles: el
+            // contenido se recorta con `mask`, pero si la ventana fuera más
+            // angosta que extendido + historial, no habría dónde crecer.
+            implicitWidth: panelWindow.extendedWidth + panelWindow.historyPanelWidth
+                + panelWindow.historyPanelGap + Appearance.sizes.elevationMargin
             WlrLayershell.namespace: "quickshell:sidebarLeft"
             // Hyprland 0.49: OnDemand is Exclusive, Exclusive just breaks click-outside-to-close
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -125,17 +131,8 @@ Scope { // Scope
                 bottom: true
             }
 
-            // Dos regiones: el panel y la barra. La ventana es más ancha que el
-            // panel, así que sin sumar la barra a la máscara se dibujaría pero no
-            // recibiría un solo clic.
-            // Dos regiones: el panel y la barra. La ventana es más ancha que el
-            // panel, así que sin sumar la barra a la máscara se dibujaría pero no
-            // recibiría un solo clic.
             mask: Region {
                 item: sidebarLeftBackground
-                regions: [
-                    Region { item: historyBar }
-                ]
             }
 
             onVisibleChanged: {
@@ -157,42 +154,6 @@ Scope { // Scope
                 target: sidebarLeftBackground
                 radius: sidebarLeftBackground.radius
             }
-            // Barra de historial: una superficie propia al costado del sidebar.
-            //
-            // Va acá y no adentro de la página del chat porque así el historial no
-            // le come ancho a la conversación: se abre AL LADO, y podés seguir
-            // viendo a los agentes trabajar mientras buscás un chat viejo.
-            StyledRectangularShadow {
-                target: historyBar
-                radius: historyBar.radius
-            }
-            Rectangle {
-                id: historyBar
-                anchors.top: sidebarLeftBackground.top
-                anchors.left: sidebarLeftBackground.right
-                anchors.leftMargin: panelWindow.historyBarGap
-                width: GlobalStates.aiHistoryOpen ? panelWindow.historyBarWidth : 0
-                height: sidebarLeftBackground.height
-                visible: width > 0
-                clip: true
-                color: Appearance.colors.colLayer0
-                border.width: 1
-                border.color: Appearance.colors.colLayer0Border
-                radius: sidebarLeftBackground.radius
-
-                Behavior on width {
-                    animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
-                }
-
-                AiHistoryPanel {
-                    anchors.fill: parent
-                    anchors.margins: 6
-                    // Sin esto el panel se sigue midiendo mientras la barra está en
-                    // 0 y el layout interno tira warnings de ancho negativo.
-                    visible: historyBar.width > 20
-                    onRequestClose: GlobalStates.aiHistoryOpen = false
-                }
-            }
 
             Rectangle {
                 id: sidebarLeftBackground
@@ -200,12 +161,15 @@ Scope { // Scope
                 anchors.left: parent.left
                 anchors.topMargin: Appearance.sizes.hyprlandGapsOut
                 anchors.leftMargin: Appearance.sizes.hyprlandGapsOut
-                width: panelWindow.sidebarWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
+                // El historial ya no es una ventana aparte al lado: cuando está
+                // abierto, este mismo panel se ensancha para mostrarlo adentro.
+                width: panelWindow.totalWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
                 height: parent.height - Appearance.sizes.hyprlandGapsOut * 2
                 color: Appearance.colors.colLayer0
                 border.width: 1
                 border.color: Appearance.colors.colLayer0Border
                 radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
+                clip: true
 
                 Behavior on width {
                     animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
@@ -213,7 +177,7 @@ Scope { // Scope
 
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
-                        // Con el historial abierto, Escape cierra primero la barra:
+                        // Con el historial abierto, Escape lo cierra primero:
                         // cerrar todo el sidebar de una sería demasiado.
                         if (GlobalStates.aiHistoryOpen) {
                             GlobalStates.aiHistoryOpen = false;
@@ -231,6 +195,40 @@ Scope { // Scope
                             root.togglePin();
                         }
                         event.accepted = true;
+                    }
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: panelWindow.historyPanelGap
+
+                    // El contenido normal del sidebar (pestañas, chat, etc.) vive
+                    // acá adentro; `contentParent` apunta a este Item en vez de a
+                    // `sidebarLeftBackground` directamente para dejarle un hueco
+                    // al lado al panel de historial.
+                    Item {
+                        id: sidebarContentArea
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                    }
+
+                    AiHistoryPanel {
+                        id: embeddedHistoryPanel
+                        Layout.fillHeight: true
+                        Layout.topMargin: 8
+                        Layout.bottomMargin: 8
+                        Layout.rightMargin: 8
+                        Layout.preferredWidth: GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth : 0
+                        // Sin esto el panel se sigue midiendo mientras el ancho está
+                        // en 0 y el layout interno tira warnings de ancho negativo.
+                        visible: width > 20
+                        clip: true
+
+                        Behavior on Layout.preferredWidth {
+                            animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+                        }
+
+                        onRequestClose: GlobalStates.aiHistoryOpen = false
                     }
                 }
             }
