@@ -208,28 +208,42 @@ Scope { // Scope
                     // al lado al panel de historial.
                     Item {
                         id: sidebarContentArea
-                        Layout.fillWidth: true
+                        // Ancho FIJO (el mismo que tenía el panel antes de que
+                        // existiera el historial), con su propio Behavior — no
+                        // fillWidth. Antes esto era fillWidth y se recalculaba cada
+                        // cuadro restando DOS animaciones independientes (el fondo
+                        // entero y el panel de historial), que nunca quedan
+                        // perfectamente sincronizadas: el chat entero (y la barra de
+                        // pestañas de arriba, que depende de este mismo ancho)
+                        // temblaba durante la transición. Con ancho fijo, abrir o
+                        // cerrar el historial no lo mueve ni un píxel.
+                        Layout.preferredWidth: panelWindow.sidebarWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
                         Layout.fillHeight: true
-                    }
-
-                    AiHistoryPanel {
-                        id: embeddedHistoryPanel
-                        Layout.fillHeight: true
-                        Layout.topMargin: 8
-                        Layout.bottomMargin: 8
-                        Layout.rightMargin: 8
-                        Layout.preferredWidth: GlobalStates.aiHistoryOpen ? panelWindow.historyPanelWidth : 0
-                        // OJO: tiene que atarse a aiHistoryOpen, NO al width propio.
-                        // Un RowLayout excluye del layout a los items invisibles, así
-                        // que "visible: width > 20" era un candado circular: nunca
-                        // recibía ancho por estar invisible, y nunca era visible por
-                        // no tener ancho. El panel jamás llegaba a mostrarse.
-                        visible: GlobalStates.aiHistoryOpen
-                        clip: true
 
                         Behavior on Layout.preferredWidth {
                             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
                         }
+                    }
+
+                    AiHistoryPanel {
+                        id: embeddedHistoryPanel
+                        // fillWidth en vez de un ancho propio animado: como el área
+                        // de contenido de al lado ya tiene ancho fijo, lo único que
+                        // puede crecer acá es lo que sobra del fondo (que ya se
+                        // anima solo, ver `sidebarLeftBackground`), así que este
+                        // panel sigue esa animación gratis, sin la suya propia.
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.topMargin: 8
+                        Layout.bottomMargin: 8
+                        Layout.rightMargin: 8
+                        // Atado a aiHistoryOpen, NO al width propio: un RowLayout
+                        // excluye del layout a los items invisibles, así que
+                        // "visible: width > 20" era un candado circular (nunca
+                        // recibía ancho por estar invisible, nunca era visible por
+                        // no tener ancho) y el panel jamás llegaba a mostrarse.
+                        visible: GlobalStates.aiHistoryOpen
+                        clip: true
 
                         onRequestClose: GlobalStates.aiHistoryOpen = false
                     }
