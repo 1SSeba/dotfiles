@@ -214,5 +214,33 @@ ColumnLayout {
                 y: addButton.height + 6
             }
         }
+
+        RippleButton {
+            id: settingsButton
+            hoverEnabled: true
+            implicitWidth: 34
+            implicitHeight: 34
+            buttonRadius: Appearance.rounding.small
+            // Abre la app de Settings (conectada al backend de Hyprland) directo
+            // en Servicios → Proveedores: login de Claude Code, keys de Gemini
+            // y OpenAI. Ver Ai.openAccountsSettings.
+            onClicked: Ai.openAccountsSettings()
+
+            contentItem: MaterialSymbol {
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: "settings"
+                iconSize: Appearance.font.pixelSize.larger
+                color: Appearance.colors.colOnLayer1
+            }
+
+            StyledToolTip {
+                text: Translation.tr("Conectar cuentas (Claude, Gemini, OpenAI)")
+                // Ver el comentario en el StyledToolTip de historyButton: mismo
+                // bug (el tooltip clampeado queda encima del botón y se come el
+                // click), mismo fix (forzarlo para abajo).
+                y: settingsButton.height + 6
+            }
+        }
     }
 }

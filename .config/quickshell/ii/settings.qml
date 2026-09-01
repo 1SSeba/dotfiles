@@ -11,6 +11,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import qs
 import qs.services
 import qs.modules.common
@@ -91,6 +92,30 @@ ApplicationWindow {
         MaterialThemeLoader.reapplyTheme()
         Config.readWriteDelay = 0 // Settings app always only sets one var at a time so delay isn't needed
         GlobalStates.settingsOpen = true
+    }
+
+    // Quien nos lanzó (p. ej. el botón de settings del sidebar de IA) puede
+    // pedir arrancar en una página puntual: lo escribe en un archivo antes de
+    // ejecutar `qs -p settings.qml` (ver Ai.openAccountsSettings /
+    // Directories.settingsTargetPagePath), porque este proceso no comparte
+    // estado en caliente con la shell. Lo leemos acá y lo borramos apenas se
+    // consume, así un "Settings" normal (sin pedir nada puntual) sigue
+    // arrancando en Quick como siempre.
+    FileView {
+        id: targetPageFile
+        path: Directories.settingsTargetPagePath
+        watchChanges: false
+        onLoadedChanged: {
+            if (!loaded) return;
+            const component = text().trim();
+            if (component.length > 0) {
+                const idx = root.pages.findIndex(p => p.component === component);
+                if (idx >= 0) root.currentPage = idx;
+            }
+            Quickshell.execDetached(["rm", "-f", Directories.settingsTargetPagePath]);
+        }
+        // Sin archivo (abriste Settings normal): no hay nada que leer, seguimos en Quick.
+        onLoadFailed: error => {}
     }
 
     // Varias páginas y servicios piden cerrar la app apagando este flag
