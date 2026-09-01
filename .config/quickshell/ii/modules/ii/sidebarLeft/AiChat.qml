@@ -32,7 +32,7 @@ Item {
     property var suggestionQuery: ""
     property var suggestionList: []
 
-    /** Qué panel de opciones está desplegado: "" | "model" | "effort" | "tool". */
+    /** Qué panel de opciones está desplegado: "" | "model" | "effort" | "tool" | "addModel". */
     property string openPicker: ""
     readonly property var toolIcons: ({
         "functions": "construction",
@@ -675,6 +675,22 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 Ai.setModel(key, false);
                 root.openPicker = "";
             }
+
+            // Chip al final de la lista para cargar un modelo custom sin tocar
+            // el config a mano (ver AiAddModelForm).
+            showAddOption: true
+            addLabel: Translation.tr("Agregar modelo")
+            onAddRequested: root.openPicker = "addModel"
+        }
+
+        AiAddModelForm {
+            Layout.fillWidth: true
+            // Comparte el mismo interruptor que model/effort/tool: así, si
+            // abrís otro picker mientras este formulario está desplegado, se
+            // cierra solo (openPicker deja de valer "addModel") sin tener que
+            // acordarse de resetear un estado aparte.
+            open: root.openPicker === "addModel"
+            onClosed: root.openPicker = ""
         }
 
         AiOptionPicker { // Esfuerzo de Claude Code

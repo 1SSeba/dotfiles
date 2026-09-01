@@ -21,6 +21,11 @@ Item {
     property var options: []
     signal picked(string key)
 
+    /** Sólo lo usa el picker de modelos: un chip "+" al final para cargar uno nuevo. */
+    property bool showAddOption: false
+    property string addLabel: ""
+    signal addRequested()
+
     implicitHeight: root.open ? optionFlow.implicitHeight + 8 : 0
     clip: true
     opacity: root.open ? 1 : 0
@@ -98,6 +103,36 @@ Item {
                         font.pixelSize: Appearance.font.pixelSize.small
                         color: optionButton.toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
                     }
+                }
+            }
+        }
+
+        // Chip "+" para agregar un modelo nuevo. Va acá adentro (no como Repeater
+        // aparte) para que quede en la misma fila que las opciones, en vez de
+        // una línea propia.
+        RippleButton {
+            id: addOptionButton
+            visible: root.open && root.showAddOption
+            implicitHeight: 32
+            implicitWidth: addOptionRow.implicitWidth + 12 * 2
+            buttonRadius: Appearance.rounding.small
+            colBackground: Appearance.colors.colLayer2
+
+            onClicked: root.addRequested()
+
+            contentItem: RowLayout {
+                id: addOptionRow
+                spacing: 6
+
+                MaterialSymbol {
+                    text: "add"
+                    iconSize: Appearance.font.pixelSize.large
+                    color: Appearance.colors.colOnLayer2
+                }
+                StyledText {
+                    text: root.addLabel
+                    font.pixelSize: Appearance.font.pixelSize.small
+                    color: Appearance.colors.colOnLayer2
                 }
             }
         }
