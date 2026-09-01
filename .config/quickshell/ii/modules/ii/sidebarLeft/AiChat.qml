@@ -34,6 +34,15 @@ Item {
 
     /** Qué panel de opciones está desplegado: "" | "model" | "effort" | "tool" | "addModel". */
     property string openPicker: ""
+    /** Modal para elegir agente al crear una pestaña nueva (ver AiNewChatDialog). */
+    property bool showNewChatDialog: false
+    readonly property var agents: Config.options?.ai?.agents ?? []
+
+    /** Ctrl+T y el botón "+" comparten esta lógica: sin nada que elegir, crear directo. */
+    function requestNewChat() {
+        if (root.agents.length <= 1) Ai.newSession();
+        else root.showNewChatDialog = true;
+    }
     readonly property var toolIcons: ({
         "functions": "construction",
         "search": "travel_explore",
@@ -69,7 +78,8 @@ Item {
         }
         // Pestañas: nueva, cerrar, e ir a la N
         if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_T) {
-            Ai.newSession();
+            // Mismo camino que el botón "+": si hay más de un agente, pregunta.
+            root.requestNewChat();
             event.accepted = true;
         } else if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_H) {
             // El historial también por teclado: el botón de la barra tiene un
@@ -408,6 +418,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             visible: Config.options.sidebar.ai.showTabBar
             historyOpen: root.historyOpen
             onHistoryToggled: root.toggleHistory()
+            onNewChatDialogRequested: root.requestNewChat()
         }
 
         Rectangle {
@@ -1134,6 +1145,25 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // Modal para elegir agente al crear pestaña (ver AiNewChatDialog). Va acá
+    // afuera del ColumnLayout, con z alto, para taparlo TODO — antes esto era
+    // una fila de chips que se desplegaba adentro de la barra de pestañas y
+    // costaba notar que había algo para elegir.
+    Loader {
+        anchors.fill: parent
+        active: root.showNewChatDialog
+        visible: root.showNewChatDialog
+        z: 9999
+        sourceComponent: AiNewChatDialog {
+            agents: root.agents
+            onCanceled: root.showNewChatDialog = false
+            onAgentPicked: agentId => {
+                Ai.newSession(agentId);
+                root.showNewChatDialog = false;
             }
         }
     }
