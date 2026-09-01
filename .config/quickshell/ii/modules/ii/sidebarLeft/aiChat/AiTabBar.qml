@@ -158,6 +158,16 @@ ColumnLayout {
             }
         }
 
+        // Estos tres botones NO llevan StyledToolTip. Ya perdieron el click dos
+        // veces por el mismo mecanismo: un Popup visible (el tooltip) queda
+        // geométricamente encima de ALGO clickeable y se come el evento antes
+        // de que llegue al botón — mover y/x lo parcha para un caso puntual
+        // pero no lo elimina (sigue siendo un Popup frágil en una fila
+        // angosta, con varios botones pegados). Son íconos autoexplicativos
+        // con sus propios atajos ya documentados en otro lado (Ctrl+H,
+        // Ctrl+T): la ganancia de un tooltip acá no vale volver a arriesgar
+        // el click. Si hace falta explicarlos, mejor un StyledText fijo al
+        // lado del ícono que un Popup.
         RippleButton {
             id: historyButton
             hoverEnabled: true
@@ -173,20 +183,6 @@ ColumnLayout {
                 text: "history"
                 iconSize: Appearance.font.pixelSize.larger
                 color: root.historyOpen ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
-            }
-
-            StyledToolTip {
-                text: Translation.tr("Historial")
-                // El default de ToolTip lo abre ARRIBA del botón (y: -height-3);
-                // acá, pegado al borde de la sidebar, QtQuick Controls lo clampea
-                // para que no se salga de la ventana y termina superpuesto sobre
-                // el propio botón. Un Popup visible ahí come el primer press
-                // aunque closePolicy sea NoAutoClose — el botón se sentía muerto
-                // porque el tooltip se abre solo con el hover, ANTES de que
-                // llegue el click. Forzarlo para abajo le garantiza espacio
-                // propio y no vuelve a solaparse. Mismo bug (y mismo fix) que
-                // ScrollHint con ScrollControl.
-                y: historyButton.height + 6
             }
         }
 
@@ -204,14 +200,6 @@ ColumnLayout {
                 text: "add"
                 iconSize: Appearance.font.pixelSize.larger
                 color: Appearance.colors.colOnLayer1
-            }
-
-            StyledToolTip {
-                text: Translation.tr("Pestaña nueva (Ctrl+T)")
-                // Ver el comentario en el StyledToolTip de historyButton: mismo
-                // bug (el tooltip clampeado queda encima del botón y se come el
-                // click), mismo fix (forzarlo para abajo).
-                y: addButton.height + 6
             }
         }
 
@@ -232,14 +220,6 @@ ColumnLayout {
                 text: "settings"
                 iconSize: Appearance.font.pixelSize.larger
                 color: Appearance.colors.colOnLayer1
-            }
-
-            StyledToolTip {
-                text: Translation.tr("Conectar cuentas (Claude, Gemini, OpenAI)")
-                // Ver el comentario en el StyledToolTip de historyButton: mismo
-                // bug (el tooltip clampeado queda encima del botón y se come el
-                // click), mismo fix (forzarlo para abajo).
-                y: settingsButton.height + 6
             }
         }
     }
