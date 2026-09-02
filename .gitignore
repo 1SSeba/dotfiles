@@ -2,6 +2,7 @@
 *.bak
 *.bak.*
 *.bak[0-9]*
+*.bak-*
 *.tar.gz
 *.zip
 *~
@@ -12,6 +13,7 @@ __pycache__/
 .config/quickshell/ii-backups/
 .config/illogical-impulse/installed_listfile
 .config/illogical-impulse/installed_true
+.config/gtk-3.0/bookmarks
 
 # Nunca subir credenciales
 *.pem
@@ -21,3 +23,7 @@ __pycache__/
 
 # el shim se compila en cada equipo
 local/lib/qs-webengine-shim/*.so
+
+# estado de sesiones de Claude Code (worktrees, historial): nunca es config
+# compartible y puede contener copias enteras del repo
+.claude/
