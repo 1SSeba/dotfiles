@@ -49,6 +49,73 @@ ContentPage {
         }
     }
 
+    // Fila de una cuenta de correo ya conectada. Antes había una sola lista con
+    // las cuentas de los tres proveedores mezcladas; ahora cada tarjeta de
+    // proveedor (Gmail/iCloud/Proton) filtra la suya y usa esta misma fila.
+    component MailAccountRow: RowLayout {
+        id: row
+        required property var account
+        Layout.fillWidth: true
+        spacing: 8
+
+        MaterialSymbol {
+            text: MailService.passwordFor(row.account.id).length > 0 ? "mark_email_read" : "key_off"
+            iconSize: Appearance.font.pixelSize.larger
+            color: MailService.passwordFor(row.account.id).length > 0
+                ? Appearance.m3colors.m3primary
+                : Appearance.colors.colSubtext
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            StyledText {
+                Layout.fillWidth: true
+                text: row.account.label
+                font.pixelSize: Appearance.font.pixelSize.small
+                color: Appearance.colors.colOnLayer1
+                elide: Text.ElideRight
+            }
+            StyledText {
+                Layout.fillWidth: true
+                text: {
+                    const id = row.account.id;
+                    if (MailService.passwordFor(id).length === 0)
+                        return Translation.tr("Sin contraseña — volvé a conectarla");
+                    const resultado = MailService.results[id];
+                    if (resultado?.error) return resultado.error;
+                    if (resultado === undefined) return row.account.host;
+                    return Translation.tr("%1 sin leer").arg(resultado.unread ?? 0);
+                }
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                elide: Text.ElideRight
+            }
+        }
+
+        ConfigSwitch {
+            checked: row.account.enable
+            onCheckedChanged: {
+                if (checked === row.account.enable) return;
+                MailService.upsertAccount(Object.assign({}, row.account, ({ "enable": checked })));
+            }
+        }
+
+        RippleButton {
+            implicitHeight: 34
+            implicitWidth: 34
+            buttonRadius: Appearance.rounding.small
+            onClicked: MailService.removeAccount(row.account.id)
+            contentItem: MaterialSymbol {
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: "delete"
+                iconSize: Appearance.font.pixelSize.large
+                color: Appearance.colors.colOnLayer1
+            }
+        }
+    }
+
     ColumnLayout {
         id: mainLayout
         Layout.fillWidth: true
@@ -246,12 +313,73 @@ ContentPage {
             shape: MaterialShape.Shape.Clover4Leaf
             title: Translation.tr("Cuentas")
 
+            // Antes esto estaba separado en "Google" / "iCloud" / "Correo": para
+            // dejar una cuenta de Gmail funcionando del todo había que conectarla
+            // acá Y buscar el botón de Gmail en otra tarjeta más abajo. Ahora cada
+            // proveedor tiene una sola tarjeta con todo lo suyo (calendario, tareas
+            // o recordatorios, y correo) — siguen siendo dos conexiones por
+            // separado adentro (cuenta y correo son credenciales distintas: OAuth
+            // contra CalDAV/IMAP con contraseña de aplicación), pero ya no hay que
+            // ir a buscar la segunda a otro lado.
+
             ContentSubsection {
-                title: Translation.tr("Google")
-                tooltip: Translation.tr("Alimenta los eventos del calendario y las tareas del widget de To Do.\n\n"
-                    + "«Conectar cuenta» abre el navegador y te guía paso a paso, con un link a cada\n"
-                    + "pantalla. Google no deja usar sus APIs sin un cliente propio, así que la primera\n"
-                    + "vez hay que crearlo — son cuatro pantallas y no se repite nunca más.")
+                title: Translation.tr("Correo")
+                tooltip: Translation.tr("Cuántos mails sin leer tenés y de quién, sumando las cuentas conectadas\n"
+                    + "en las tarjetas de abajo.\n\n"
+                    + "Va por IMAP y no por OAuth a propósito: una contraseña de aplicación no vence\n"
+                    + "nunca y el mismo lector sirve para Gmail, iCloud y Proton. El buzón se abre en\n"
+                    + "modo lectura, así que mirar el widget no te marca nada como leído.")
+
+                NoticeBox {
+                    Layout.fillWidth: true
+                    materialIcon: MailService.connectError.length > 0 || MailService.lastError.length > 0 ? "error"
+                        : MailService.enabled ? "check_circle"
+                        : "info"
+                    text: MailService.connectError.length > 0 ? MailService.connectError : MailService.status
+                }
+
+                ConfigSwitch {
+                    buttonIcon: "mail"
+                    text: Translation.tr("Mostrar el correo")
+                    checked: Config.options.services.mail.enable
+                    onCheckedChanged: {
+                        Config.options.services.mail.enable = checked;
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    RippleButtonWithIcon {
+                        materialIcon: "sync"
+                        mainText: Translation.tr("Revisar ahora")
+                        enabled: MailService.configured && !MailService.loading
+                        onClicked: MailService.refresh()
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+
+                ConfigSpinBox {
+                    icon: "av_timer"
+                    text: Translation.tr("Revisar cada (min)")
+                    value: Config.options.services.mail.refreshMinutes
+                    from: 1
+                    to: 120
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.options.services.mail.refreshMinutes = value;
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Gmail")
+                tooltip: Translation.tr("Todo lo de Gmail en un solo lugar: calendario, tareas y correo.\n\n"
+                    + "«Conectar cuenta» es para el calendario y las tareas — abre el navegador y\n"
+                    + "guía paso a paso; Google no deja usar sus APIs sin un cliente propio, así que\n"
+                    + "la primera vez hay que crearlo (cuatro pantallas, no se repite nunca más).\n\n"
+                    + "«Agregar correo» es aparte porque usa una contraseña de aplicación por IMAP\n"
+                    + "en vez de OAuth: no vence nunca y no depende de que Google apruebe nada.")
 
                 NoticeBox {
                     Layout.fillWidth: true
@@ -363,17 +491,56 @@ ContentPage {
                         Config.options.services.google.tasks.refreshMinutes = value;
                     }
                 }
+
+                ContentSubsection {
+                    title: Translation.tr("Correo")
+                    Layout.topMargin: 6
+
+                    // Una fila por cuenta de Gmail ya conectada. La contraseña no
+                    // se muestra ni se edita acá: para cambiarla se vuelve a
+                    // conectar, que además la verifica.
+                    Repeater {
+                        model: MailService.accountsFor("gmail")
+                        delegate: MailAccountRow {
+                            required property var modelData
+                            account: modelData
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        RippleButtonWithIcon {
+                            materialIcon: MailService.connecting === "gmail" ? "hourglass_top" : "add"
+                            mainText: MailService.connecting === "gmail"
+                                ? Translation.tr("Esperando al navegador…")
+                                : Translation.tr("Agregar correo")
+                            enabled: MailService.connectState !== "waiting" && MailService.connectState !== "working"
+                            onClicked: MailService.connectAccount("gmail")
+                        }
+
+                        RippleButtonWithIcon {
+                            visible: MailService.connectState === "waiting" && MailService.connecting === "gmail"
+                            materialIcon: "close"
+                            mainText: Translation.tr("Cancelar")
+                            onClicked: MailService.cancelConnect()
+                        }
+
+                        Item { Layout.fillWidth: true }
+                    }
+                }
             }
 
             ContentSubsection {
                 title: Translation.tr("iCloud")
-                tooltip: Translation.tr("Calendario, Recordatorios y correo de iCloud.\n\n"
+                tooltip: Translation.tr("Todo lo de iCloud en un solo lugar: calendario, recordatorios y correo.\n\n"
                     + "Apple no tiene OAuth para esto: «Iniciar sesión con Apple» te loguea en OTROS\n"
                     + "sitios, no da acceso a tus datos. Lo único que existe para un cliente de\n"
-                    + "terceros es CalDAV/IMAP con una contraseña de aplicación.\n\n"
-                    + "Igual no tenés que buscar nada: «Conectar cuenta» abre el navegador, te linkea\n"
-                    + "directo a donde se genera y verifica la credencial antes de guardarla.\n"
-                    + "Se revoca cuando quieras desde account.apple.com.")
+                    + "terceros es CalDAV/IMAP con una contraseña de aplicación — por eso «Conectar\n"
+                    + "cuenta» (calendario y recordatorios) y «Agregar correo» son dos pasos\n"
+                    + "separados, aunque las dos abren el navegador y guían paso a paso, sin que\n"
+                    + "tengas que buscar nada vos. Se revocan cuando quieras desde account.apple.com.")
 
                 NoticeBox {
                     Layout.fillWidth: true
@@ -464,105 +631,57 @@ ContentPage {
                         Config.options.services.apple.reminders.refreshMinutes = value;
                     }
                 }
-            }
 
-            ContentSubsection {
-                title: Translation.tr("Correo")
-                tooltip: Translation.tr("Cuántos mails sin leer tenés y de quién, de todas tus cuentas juntas.\n\n"
-                    + "Va por IMAP y no por OAuth a propósito: una contraseña de aplicación no vence\n"
-                    + "nunca y el mismo lector sirve para Gmail, iCloud y Proton.\n\n"
-                    + "Proton necesita Proton Mail Bridge corriendo: tu correo está cifrado y no hay\n"
-                    + "IMAP público. La página de conexión te explica cómo y te avisa si no está.\n\n"
-                    + "«Agregar» abre el navegador, te linkea directo a donde se genera la contraseña\n"
-                    + "y la verifica antes de guardarla. El buzón se abre en modo lectura, así que\n"
-                    + "mirar el widget no te marca nada como leído.")
+                ContentSubsection {
+                    title: Translation.tr("Correo")
+                    Layout.topMargin: 6
 
-                NoticeBox {
-                    Layout.fillWidth: true
-                    materialIcon: MailService.connectError.length > 0 || MailService.lastError.length > 0 ? "error"
-                        : MailService.enabled ? "check_circle"
-                        : "info"
-                    text: MailService.connectError.length > 0 ? MailService.connectError : MailService.status
-                }
-
-                ConfigSwitch {
-                    buttonIcon: "mail"
-                    text: Translation.tr("Mostrar el correo")
-                    checked: Config.options.services.mail.enable
-                    onCheckedChanged: {
-                        Config.options.services.mail.enable = checked;
+                    Repeater {
+                        model: MailService.accountsFor("icloud")
+                        delegate: MailAccountRow {
+                            required property var modelData
+                            account: modelData
+                        }
                     }
-                }
-
-                // Una fila por cuenta. La contraseña no se muestra ni se edita acá:
-                // para cambiarla se vuelve a conectar, que además la verifica.
-                Repeater {
-                    model: MailService.allAccounts
 
                     RowLayout {
-                        id: mailAccountRow
-                        required property var modelData
                         Layout.fillWidth: true
                         spacing: 8
 
-                        MaterialSymbol {
-                            text: MailService.passwordFor(mailAccountRow.modelData.id).length > 0
-                                ? "mark_email_read" : "key_off"
-                            iconSize: Appearance.font.pixelSize.larger
-                            color: MailService.passwordFor(mailAccountRow.modelData.id).length > 0
-                                ? Appearance.m3colors.m3primary
-                                : Appearance.colors.colSubtext
+                        RippleButtonWithIcon {
+                            materialIcon: MailService.connecting === "icloud" ? "hourglass_top" : "add"
+                            mainText: MailService.connecting === "icloud"
+                                ? Translation.tr("Esperando al navegador…")
+                                : Translation.tr("Agregar correo")
+                            enabled: MailService.connectState !== "waiting" && MailService.connectState !== "working"
+                            onClicked: MailService.connectAccount("icloud")
                         }
 
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 0
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: mailAccountRow.modelData.label
-                                font.pixelSize: Appearance.font.pixelSize.small
-                                color: Appearance.colors.colOnLayer1
-                                elide: Text.ElideRight
-                            }
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: {
-                                    const id = mailAccountRow.modelData.id;
-                                    if (MailService.passwordFor(id).length === 0)
-                                        return Translation.tr("Sin contraseña — volvé a conectarla");
-                                    const resultado = MailService.results[id];
-                                    if (resultado?.error) return resultado.error;
-                                    if (resultado === undefined) return mailAccountRow.modelData.host;
-                                    return Translation.tr("%1 sin leer").arg(resultado.unread ?? 0);
-                                }
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                color: Appearance.colors.colSubtext
-                                elide: Text.ElideRight
-                            }
+                        RippleButtonWithIcon {
+                            visible: MailService.connectState === "waiting" && MailService.connecting === "icloud"
+                            materialIcon: "close"
+                            mainText: Translation.tr("Cancelar")
+                            onClicked: MailService.cancelConnect()
                         }
 
-                        ConfigSwitch {
-                            checked: mailAccountRow.modelData.enable
-                            onCheckedChanged: {
-                                if (checked === mailAccountRow.modelData.enable) return;
-                                MailService.upsertAccount(Object.assign({},
-                                    mailAccountRow.modelData, ({ "enable": checked })));
-                            }
-                        }
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+            }
 
-                        RippleButton {
-                            implicitHeight: 34
-                            implicitWidth: 34
-                            buttonRadius: Appearance.rounding.small
-                            onClicked: MailService.removeAccount(mailAccountRow.modelData.id)
-                            contentItem: MaterialSymbol {
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                text: "delete"
-                                iconSize: Appearance.font.pixelSize.large
-                                color: Appearance.colors.colOnLayer1
-                            }
-                        }
+            ContentSubsection {
+                title: Translation.tr("Proton")
+                tooltip: Translation.tr("Proton no tiene calendario ni tareas acá: no expone una API pública para\n"
+                    + "eso, así que solo el correo está disponible.\n\n"
+                    + "Necesita Proton Mail Bridge corriendo: tu correo está cifrado y no hay IMAP\n"
+                    + "público. «Agregar correo» abre el navegador, te explica cómo y avisa si no\n"
+                    + "encuentra el Bridge, antes de generar y verificar la contraseña.")
+
+                Repeater {
+                    model: MailService.accountsFor("proton")
+                    delegate: MailAccountRow {
+                        required property var modelData
+                        account: modelData
                     }
                 }
 
@@ -571,64 +690,22 @@ ContentPage {
                     spacing: 8
 
                     RippleButtonWithIcon {
-                        materialIcon: MailService.connecting === "gmail" ? "hourglass_top" : "add"
-                        mainText: MailService.connecting === "gmail"
-                            ? Translation.tr("Esperando al navegador…")
-                            : Translation.tr("Agregar Gmail")
-                        enabled: MailService.connectState !== "waiting" && MailService.connectState !== "working"
-                        onClicked: MailService.connectAccount("gmail")
-                    }
-
-                    RippleButtonWithIcon {
-                        materialIcon: MailService.connecting === "icloud" ? "hourglass_top" : "add"
-                        mainText: MailService.connecting === "icloud"
-                            ? Translation.tr("Esperando al navegador…")
-                            : Translation.tr("Agregar iCloud")
-                        enabled: MailService.connectState !== "waiting" && MailService.connectState !== "working"
-                        onClicked: MailService.connectAccount("icloud")
-                    }
-
-                    RippleButtonWithIcon {
                         materialIcon: MailService.connecting === "proton" ? "hourglass_top" : "add"
                         mainText: MailService.connecting === "proton"
                             ? Translation.tr("Esperando al navegador…")
-                            : Translation.tr("Agregar Proton")
+                            : Translation.tr("Agregar correo")
                         enabled: MailService.connectState !== "waiting" && MailService.connectState !== "working"
                         onClicked: MailService.connectAccount("proton")
                     }
 
                     RippleButtonWithIcon {
-                        visible: MailService.connectState === "waiting"
+                        visible: MailService.connectState === "waiting" && MailService.connecting === "proton"
                         materialIcon: "close"
                         mainText: Translation.tr("Cancelar")
                         onClicked: MailService.cancelConnect()
                     }
 
                     Item { Layout.fillWidth: true }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    RippleButtonWithIcon {
-                        materialIcon: "sync"
-                        mainText: Translation.tr("Revisar ahora")
-                        enabled: MailService.configured && !MailService.loading
-                        onClicked: MailService.refresh()
-                    }
-                    Item { Layout.fillWidth: true }
-                }
-
-                ConfigSpinBox {
-                    icon: "av_timer"
-                    text: Translation.tr("Revisar cada (min)")
-                    value: Config.options.services.mail.refreshMinutes
-                    from: 1
-                    to: 120
-                    stepSize: 1
-                    onValueChanged: {
-                        Config.options.services.mail.refreshMinutes = value;
-                    }
                 }
             }
         }

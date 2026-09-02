@@ -59,13 +59,13 @@ Singleton {
 
     function incrementVolume() {
         const currentVolume = Audio.value;
-        const step = currentVolume < 0.1 ? 0.01 : 0.02 || 0.2;
+        const step = currentVolume < 0.1 ? 0.01 : (Config.options.audio.volumeStep / 100);
         Audio.sink.audio.volume = Math.min(1, Audio.sink.audio.volume + step);
     }
-    
+
     function decrementVolume() {
         const currentVolume = Audio.value;
-        const step = currentVolume < 0.1 ? 0.01 : 0.02 || 0.2;
+        const step = currentVolume < 0.1 ? 0.01 : (Config.options.audio.volumeStep / 100);
         Audio.sink.audio.volume -= step;
     }
 

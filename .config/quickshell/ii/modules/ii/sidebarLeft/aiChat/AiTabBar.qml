@@ -11,18 +11,18 @@ import QtQuick.Layouts
  *
  * Cada chip muestra el icono del agente, su nombre, un indicador de "respondiendo"
  * y un punto cuando la respuesta terminó mientras mirabas otra pestaña. El botón "+"
- * despliega la lista de agentes de Config.options.ai.agents.
+ * pide el modal de AiNewChatDialog (lo dibuja AiChat, acá sólo se pide) para
+ * elegir con qué agente arrancar, salvo que haya uno solo configurado.
  */
 ColumnLayout {
     id: root
 
-    /** Está abierto el selector de agente. */
-    property bool pickerOpen: false
     /** Está abierto el panel de historial (lo dibuja AiChat, acá sólo se pide). */
     property bool historyOpen: false
 
     signal historyToggled()
-    readonly property var agents: Config.options?.ai?.agents ?? []
+    /** Pide crear una pestaña nueva (AiChat decide si hace falta el modal de agente). */
+    signal newChatDialogRequested()
 
     spacing: 4
 
@@ -158,6 +158,16 @@ ColumnLayout {
             }
         }
 
+        // Estos tres botones NO llevan StyledToolTip. Ya perdieron el click dos
+        // veces por el mismo mecanismo: un Popup visible (el tooltip) queda
+        // geométricamente encima de ALGO clickeable y se come el evento antes
+        // de que llegue al botón — mover y/x lo parcha para un caso puntual
+        // pero no lo elimina (sigue siendo un Popup frágil en una fila
+        // angosta, con varios botones pegados). Son íconos autoexplicativos
+        // con sus propios atajos ya documentados en otro lado (Ctrl+H,
+        // Ctrl+T): la ganancia de un tooltip acá no vale volver a arriesgar
+        // el click. Si hace falta explicarlos, mejor un StyledText fijo al
+        // lado del ícono que un Popup.
         RippleButton {
             id: historyButton
             hoverEnabled: true
@@ -174,10 +184,6 @@ ColumnLayout {
                 iconSize: Appearance.font.pixelSize.larger
                 color: root.historyOpen ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
             }
-
-            StyledToolTip {
-                text: Translation.tr("Historial")
-            }
         }
 
         RippleButton {
@@ -186,85 +192,34 @@ ColumnLayout {
             implicitWidth: 34
             implicitHeight: 34
             buttonRadius: Appearance.rounding.small
-            toggled: root.pickerOpen
-            onClicked: {
-                // Con un solo agente definido no hay nada que elegir
-                if (root.agents.length <= 1) Ai.newSession();
-                else root.pickerOpen = !root.pickerOpen;
-            }
+            onClicked: root.newChatDialogRequested()
 
             contentItem: MaterialSymbol {
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 text: "add"
                 iconSize: Appearance.font.pixelSize.larger
-                color: root.pickerOpen ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer1
-            }
-
-            StyledToolTip {
-                text: Translation.tr("Pestaña nueva (Ctrl+T)")
+                color: Appearance.colors.colOnLayer1
             }
         }
-    }
 
-    // Selector de agente
-    Item {
-        Layout.fillWidth: true
-        implicitHeight: root.pickerOpen ? pickerFlow.implicitHeight + 8 : 0
-        clip: true
-        opacity: root.pickerOpen ? 1 : 0
-        visible: implicitHeight > 0
+        RippleButton {
+            id: settingsButton
+            hoverEnabled: true
+            implicitWidth: 34
+            implicitHeight: 34
+            buttonRadius: Appearance.rounding.small
+            // Abre la app de Settings (conectada al backend de Hyprland) directo
+            // en Servicios → Proveedores: login de Claude Code, keys de Gemini
+            // y OpenAI. Ver Ai.openAccountsSettings.
+            onClicked: Ai.openAccountsSettings()
 
-        Behavior on implicitHeight {
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-        }
-        Behavior on opacity {
-            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-        }
-
-        Flow {
-            id: pickerFlow
-            anchors {
-                left: parent.left
-                right: parent.right
-                top: parent.top
-                topMargin: 4
-            }
-            spacing: 4
-
-            Repeater {
-                // Igual que en AiOptionPicker: no construir los botones si está cerrado
-                model: root.pickerOpen ? root.agents : []
-
-                delegate: RippleButton {
-                    id: agentButton
-                    required property var modelData
-                    implicitHeight: 32
-                    implicitWidth: agentButtonRow.implicitWidth + 12 * 2
-                    buttonRadius: Appearance.rounding.small
-                    colBackground: Appearance.colors.colLayer2
-
-                    onClicked: {
-                        Ai.newSession(agentButton.modelData.id);
-                        root.pickerOpen = false;
-                    }
-
-                    contentItem: RowLayout {
-                        id: agentButtonRow
-                        spacing: 6
-
-                        MaterialSymbol {
-                            text: agentButton.modelData.icon || "neurology"
-                            iconSize: Appearance.font.pixelSize.large
-                            color: Appearance.colors.colOnLayer2
-                        }
-                        StyledText {
-                            text: agentButton.modelData.name ?? agentButton.modelData.id
-                            font.pixelSize: Appearance.font.pixelSize.small
-                            color: Appearance.colors.colOnLayer2
-                        }
-                    }
-                }
+            contentItem: MaterialSymbol {
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                text: "settings"
+                iconSize: Appearance.font.pixelSize.larger
+                color: Appearance.colors.colOnLayer1
             }
         }
     }

@@ -292,7 +292,7 @@ ApplicationWindow {
                                 konachanWallProc.running = true;
                             }
                             StyledToolTip {
-                                text: Translation.tr("Random SFW Anime wallpaper from Konachan\nImage is saved to ~/Pictures/Wallpapers")
+                                text: Translation.tr("Random SFW Anime wallpaper from Konachan\nImage is saved to ~/Pictures/wallpapers")
                             }
                         }
                         RippleButtonWithIcon {

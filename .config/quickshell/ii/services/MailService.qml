@@ -147,6 +147,31 @@ Singleton {
         Config.options.services.mail.user = "";
     }
 
+    /**
+     * A qué proveedor pertenece una cuenta ya guardada, para agruparlas en la UI
+     * de Ajustes (una tarjeta por proveedor en vez de una lista plana). La id
+     * nueva ya viene prefijada por accountId(); una cuenta vieja (id "default",
+     * de antes de que esto fuera multicuenta) no tiene ese prefijo y hay que
+     * adivinar por host/dirección.
+     */
+    function providerFor(account) {
+        const id = String(account?.id ?? "");
+        if (id.startsWith("gmail-")) return "gmail";
+        if (id.startsWith("icloud-")) return "icloud";
+        if (id.startsWith("proton-")) return "proton";
+
+        const host = String(account?.host ?? "").toLowerCase();
+        const user = String(account?.user ?? "").toLowerCase();
+        if (user.endsWith("@proton.me") || user.endsWith("@protonmail.com")
+            || user.endsWith("@pm.me") || user.endsWith("@protonmail.ch")) return "proton";
+        if (host.indexOf("icloud") >= 0 || host.indexOf("me.com") >= 0) return "icloud";
+        return "gmail";
+    }
+
+    function accountsFor(provider) {
+        return root.allAccounts.filter(a => root.providerFor(a) === provider);
+    }
+
     /** El webmail que le corresponde a una cuenta, para el botón de "abrir". */
     function webmailFor(host, user) {
         const lower = String(host ?? "").toLowerCase();

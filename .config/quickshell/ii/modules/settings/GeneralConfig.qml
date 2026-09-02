@@ -17,48 +17,6 @@ ContentPage {
     }
 
     ContentSection {
-        icon: "volume_up"
-        title: Translation.tr("Audio")
-
-        ConfigSwitch {
-            buttonIcon: "hearing"
-            text: Translation.tr("Earbang protection")
-            checked: Config.options.audio.protection.enable
-            onCheckedChanged: {
-                Config.options.audio.protection.enable = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Prevents abrupt increments and restricts volume limit")
-            }
-        }
-        ConfigRow {
-            enabled: Config.options.audio.protection.enable
-            ConfigSpinBox {
-                icon: "arrow_warm_up"
-                text: Translation.tr("Max allowed increase")
-                value: Config.options.audio.protection.maxAllowedIncrease
-                from: 0
-                to: 100
-                stepSize: 2
-                onValueChanged: {
-                    Config.options.audio.protection.maxAllowedIncrease = value;
-                }
-            }
-            ConfigSpinBox {
-                icon: "vertical_align_top"
-                text: Translation.tr("Volume limit")
-                value: Config.options.audio.protection.maxAllowed
-                from: 0
-                to: 154 // pavucontrol allows up to 153%
-                stepSize: 2
-                onValueChanged: {
-                    Config.options.audio.protection.maxAllowed = value;
-                }
-            }
-        }
-    }
-
-    ContentSection {
         icon: "battery_android_full"
         title: Translation.tr("Battery")
 
@@ -192,96 +150,42 @@ ContentPage {
     }
 
     ContentSection {
-        icon: "rule"
-        title: Translation.tr("Policies")
+        icon: "policy"
+        title: Translation.tr("Políticas")
 
-        ConfigRow {
+        ContentSubsection {
+            title: Translation.tr("Inteligencia artificial")
+            tooltip: Translation.tr("\"Local\" deja el chat pero solo con modelos que corran en la máquina")
 
-            // AI policy
-            ColumnLayout {
-                ContentSubsectionLabel {
-                    text: Translation.tr("AI")
+            ConfigSelectionArray {
+                Layout.fillWidth: false
+                currentValue: Config.options.policies.ai
+                onSelected: newValue => {
+                    Config.options.policies.ai = newValue;
                 }
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.policies.ai
-                    onSelected: newValue => {
-                        Config.options.policies.ai = newValue;
-                    }
-                    options: [
-                        {
-                            displayName: Translation.tr("No"),
-                            icon: "close",
-                            value: 0
-                        },
-                        {
-                            displayName: Translation.tr("Yes"),
-                            icon: "check",
-                            value: 1
-                        },
-                        {
-                            displayName: Translation.tr("Local only"),
-                            icon: "sync_saved_locally",
-                            value: 2
-                        }
-                    ]
-                }
-            }
-
-            // Weeb policy
-            ColumnLayout {
-
-                ContentSubsectionLabel {
-                    text: Translation.tr("Weeb")
-                }
-
-                ConfigSelectionArray {
-                    currentValue: Config.options.policies.weeb
-                    onSelected: newValue => {
-                        Config.options.policies.weeb = newValue;
-                    }
-                    options: [
-                        {
-                            displayName: Translation.tr("No"),
-                            icon: "close",
-                            value: 0
-                        },
-                        {
-                            displayName: Translation.tr("Yes"),
-                            icon: "check",
-                            value: 1
-                        },
-                        {
-                            displayName: Translation.tr("Closet"),
-                            icon: "ev_shadow",
-                            value: 2
-                        }
-                    ]
-                }
+                options: [
+                    { displayName: Translation.tr("No"), icon: "close", value: 0 },
+                    { displayName: Translation.tr("Sí"), icon: "check", value: 1 },
+                    { displayName: Translation.tr("Local"), icon: "sync_saved_locally", value: 2 }
+                ]
             }
         }
-    }
 
-    ContentSection {
-        icon: "notification_sound"
-        title: Translation.tr("Sounds")
-        ConfigRow {
-            uniform: true
-            ConfigSwitch {
-                buttonIcon: "battery_android_full"
-                text: Translation.tr("Battery")
-                checked: Config.options.sounds.battery
-                onCheckedChanged: {
-                    Config.options.sounds.battery = checked;
+        ContentSubsection {
+            title: Translation.tr("Contenido weeb")
+            tooltip: Translation.tr("\"Placard\" lo deja disponible pero sin que salte a la vista")
+
+            ConfigSelectionArray {
+                Layout.fillWidth: false
+                currentValue: Config.options.policies.weeb
+                onSelected: newValue => {
+                    Config.options.policies.weeb = newValue;
                 }
-            }
-            ConfigSwitch {
-                buttonIcon: "av_timer"
-                text: Translation.tr("Pomodoro")
-                checked: Config.options.sounds.pomodoro
-                onCheckedChanged: {
-                    Config.options.sounds.pomodoro = checked;
-                }
+                options: [
+                    { displayName: Translation.tr("No"), icon: "close", value: 0 },
+                    { displayName: Translation.tr("Sí"), icon: "check", value: 1 },
+                    { displayName: Translation.tr("Placard"), icon: "ev_shadow", value: 2 }
+                ]
             }
         }
     }
@@ -516,4 +420,114 @@ ContentPage {
             }
         }
     }
+    ContentSection {
+        icon: "text_format"
+        title: Translation.tr("Fonts")
+
+        ContentSubsection {
+            title: Translation.tr("Main font")
+            tooltip: Translation.tr("Used for general UI text")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name (e.g., Google Sans Flex)")
+                text: Config.options.appearance.fonts.main
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.main = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Numbers font")
+            tooltip: Translation.tr("Used for displaying numbers")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name")
+                text: Config.options.appearance.fonts.numbers
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.numbers = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Title font")
+            tooltip: Translation.tr("Used for headings and titles")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name")
+                text: Config.options.appearance.fonts.title
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.title = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Monospace font")
+            tooltip: Translation.tr("Used for code and terminal")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name (e.g., JetBrains Mono NF)")
+                text: Config.options.appearance.fonts.monospace
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.monospace = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Nerd font icons")
+            tooltip: Translation.tr("Font used for Nerd Font icons")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name (e.g., JetBrains Mono NF)")
+                text: Config.options.appearance.fonts.iconNerd
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.iconNerd = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Reading font")
+            tooltip: Translation.tr("Used for reading large blocks of text")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name (e.g., Readex Pro)")
+                text: Config.options.appearance.fonts.reading
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.reading = text;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Expressive font")
+            tooltip: Translation.tr("Used for decorative/expressive text")
+
+            MaterialTextArea {
+                Layout.fillWidth: true
+                placeholderText: Translation.tr("Font family name (e.g., Space Grotesk)")
+                text: Config.options.appearance.fonts.expressive
+                wrapMode: TextEdit.NoWrap
+                onTextChanged: {
+                    Config.options.appearance.fonts.expressive = text;
+                }
+            }
+        }
+    }
+
 }

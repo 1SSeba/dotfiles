@@ -104,7 +104,14 @@ RippleButton {
     }
 
     onClicked: {
+        // Este item se usa tanto en el Overview (Super+Tab) como en el
+        // AppLauncher (Super sola), cada uno con su propio flag de "abierto".
+        // Antes solo se apagaba overviewOpen, asi que al ejecutar algo desde
+        // el AppLauncher (abrir una app, copiar un resultado de calculadora,
+        // etc.) la barra se quedaba abierta sin dar ningun indicio de que se
+        // hizo click.
         GlobalStates.overviewOpen = false
+        GlobalStates.appLauncherOpen = false
         root.itemExecute()
     }
     Keys.onPressed: (event) => {

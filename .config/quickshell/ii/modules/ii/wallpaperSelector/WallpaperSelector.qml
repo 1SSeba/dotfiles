@@ -67,7 +67,12 @@ Scope {
             Wallpapers.openFallbackPicker(Appearance.m3colors.darkmode);
             return;
         }
-        GlobalStates.wallpaperSelectorOpen = !GlobalStates.wallpaperSelectorOpen
+        const opening = !GlobalStates.wallpaperSelectorOpen;
+        // Abrir desde el atajo/la barra no apunta a ningún monitor en particular:
+        // por defecto aplica a todos. (El menú de escritorio, en cambio, precarga
+        // el monitor sobre el que se hizo click derecho antes de abrir el selector.)
+        if (opening) GlobalStates.wallpaperSelectorTargetMonitor = "";
+        GlobalStates.wallpaperSelectorOpen = opening
     }
 
     IpcHandler {

@@ -62,6 +62,12 @@ Singleton {
     property string userAvatarPathAccountsService: FileUtils.trimFileProtocol(`/var/lib/AccountsService/icons/${SystemInfo.username}`)
     property string userAvatarPathRicersAndWeirdSystems: FileUtils.trimFileProtocol(`${Directories.home}.face`)
     property string userAvatarPathRicersAndWeirdSystems2: FileUtils.trimFileProtocol(`${Directories.home}.face.icon`)
+    // Settings corre en su PROPIO proceso (`qs -p settings.qml`), así que no
+    // comparte singletons en caliente con la shell (ver el comentario de
+    // GlobalStates.settingsOpen). Para abrirlo directo en una página puntual,
+    // quien lo lanza escribe acá el `component` de esa página antes de
+    // ejecutar el proceso, y settings.qml lo lee al arrancar y lo borra.
+    property string settingsTargetPagePath: FileUtils.trimFileProtocol(`${Directories.state}/user/settings_target_page.txt`)
     // Cleanup on init
     Component.onCompleted: {
         Quickshell.execDetached(["mkdir", "-p", `${userPresetsPath}`])

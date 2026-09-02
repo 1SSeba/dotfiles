@@ -16,32 +16,50 @@ ColumnLayout {
     width: parent.width
     spacing: 4
 
-    function addEntry() {
+    // El campo de comando tiene un debounce de 3s antes de guardar (si escribiera
+    // en Config en cada tecla, la lista se reasigna entera y el Repeater reconstruye
+    // todos los delegates, así que perderías el foco a mitad de escribir). El
+    // problema es que agregar/borrar/mover otra fila también reasigna la lista
+    // entera — y si eso pasaba antes de que el debounce disparara, se reconstruía
+    // con el valor viejo y lo recién tipeado en la fila de arriba desaparecía.
+    // Por eso toda mutación pasa por acá: lee la lista pisando cualquier campo
+    // que todavía esté esperando su debounce, para no perderlo nunca.
+    function snapshotWithPending() {
         let list = []
         for (let i = 0; i < Config.options.hyprland.autostartApps.apps.length; i++) {
             let o = Config.options.hyprland.autostartApps.apps[i]
             list.push({ cmd: o.cmd, workspace: o.workspace, delay: o.delay })
         }
+        for (let i = 0; i < appsRepeater.count; i++) {
+            const item = appsRepeater.itemAt(i)
+            const pending = item?.pendingCmd
+            if (pending !== undefined && list[i]) list[i].cmd = pending
+        }
+        return list
+    }
+
+    // Plano y sin "icon": si se le pasan los DesktopEntry tal cual, el combo
+    // intenta pintar entry.icon (nombre de ícono del sistema, ej. "firefox")
+    // como si fuera un glifo Material Symbol y muestra basura al lado de cada app.
+    readonly property var appPickerModel: AppSearch.list.map(e => ({
+        name: e.name,
+        cmd: e.command.join(" ")
+    }))
+
+    function addEntry() {
+        let list = root.snapshotWithPending()
         list.push({ cmd: "", workspace: 1, delay: 0 })
         Config.options.hyprland.autostartApps.apps = list
     }
 
     function removeEntry(index) {
-        let list = []
-        for (let i = 0; i < Config.options.hyprland.autostartApps.apps.length; i++) {
-            if (i === index) continue
-            let o = Config.options.hyprland.autostartApps.apps[i]
-            list.push({ cmd: o.cmd, workspace: o.workspace, delay: o.delay })
-        }
+        let list = root.snapshotWithPending()
+        list.splice(index, 1)
         Config.options.hyprland.autostartApps.apps = list
     }
 
     function updateEntry(index, key, value) {
-        let list = []
-        for (let i = 0; i < Config.options.hyprland.autostartApps.apps.length; i++) {
-            let o = Config.options.hyprland.autostartApps.apps[i]
-            list.push({ cmd: o.cmd, workspace: o.workspace, delay: o.delay })
-        }
+        let list = root.snapshotWithPending()
         list[index][key] = value
         Config.options.hyprland.autostartApps.apps = list
     }
@@ -135,8 +153,12 @@ ColumnLayout {
             required property var modelData
             required property int index
             Layout.fillWidth: true
-            implicitHeight: cmdArea.implicitHeight
+            implicitHeight: fieldsColumn.implicitHeight
             visible: Config.options.hyprland.autostartApps.enable
+
+            // undefined = nada pendiente; lo lee root.snapshotWithPending() antes
+            // de reconstruir la lista para no pisar un cambio recién tipeado.
+            readonly property var pendingCmd: cmdDebounceTimer.running ? cmdArea.text : undefined
 
             Row {
                 id: rightGroup
@@ -193,30 +215,63 @@ ColumnLayout {
                 }
             }
 
-            MaterialTextArea {
-                id: cmdArea
+            ColumnLayout {
+                id: fieldsColumn
                 anchors.left: parent.left
                 anchors.right: rightGroup.left
                 anchors.rightMargin: 6
-                placeholderText: Translation.tr("App (e.g. firefox)")
-                text: entryRow.modelData.cmd ?? ""
-                wrapMode: TextEdit.Wrap
-                font.pixelSize: Appearance.font.pixelSize.normal
+                spacing: 4
 
-                property bool ready: false
-                Component.onCompleted: ready = true
-
-                onTextChanged: {
-                    if (!ready) return
-                    debounceTimer.restart()
+                // Elegir de la lista de apps instaladas en vez de escribir el
+                // comando a mano; el campo de abajo sigue editable por si hace
+                // falta ajustar argumentos o poner un comando propio.
+                StyledComboBoxSearch {
+                    Layout.fillWidth: true
+                    buttonIcon: "apps"
+                    textRole: "name"
+                    model: root.appPickerModel
+                    currentIndex: -1
+                    displayText: Translation.tr("Elegir una app instalada…")
+                    onActivated: idx => {
+                        const picked = root.appPickerModel[idx]
+                        if (!picked) return
+                        cmdDebounceTimer.stop()
+                        cmdArea.text = picked.cmd
+                        root.updateEntry(entryRow.index, "cmd", picked.cmd)
+                    }
                 }
 
-                Timer {
-                    id: debounceTimer
-                    interval: 3000
-                    repeat: false
-                    onTriggered: {
-                        root.updateEntry(entryRow.index, "cmd", cmdArea.text)
+                MaterialTextArea {
+                    id: cmdArea
+                    Layout.fillWidth: true
+                    placeholderText: Translation.tr("Comando (o elegí una app arriba)")
+                    text: entryRow.modelData.cmd ?? ""
+                    wrapMode: TextEdit.Wrap
+                    font.pixelSize: Appearance.font.pixelSize.normal
+
+                    property bool ready: false
+                    Component.onCompleted: ready = true
+
+                    onTextChanged: {
+                        if (!ready) return
+                        cmdDebounceTimer.restart()
+                    }
+                    onActiveFocusChanged: {
+                        // Guarda apenas se va el foco en vez de esperar los 3s,
+                        // así clickear afuera nunca deja un cambio a mitad de guardar.
+                        if (!activeFocus && cmdDebounceTimer.running) {
+                            cmdDebounceTimer.stop()
+                            root.updateEntry(entryRow.index, "cmd", cmdArea.text)
+                        }
+                    }
+
+                    Timer {
+                        id: cmdDebounceTimer
+                        interval: 3000
+                        repeat: false
+                        onTriggered: {
+                            root.updateEntry(entryRow.index, "cmd", cmdArea.text)
+                        }
                     }
                 }
             }

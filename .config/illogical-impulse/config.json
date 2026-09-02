@@ -135,7 +135,7 @@
     },
     "appearance": {
         "extraBackgroundTint": true,
-        "fakeScreenRounding": 2,
+        "fakeScreenRounding": 1,
         "fonts": {
             "expressive": "Space Grotesk",
             "iconNerd": "JetBrains Mono NF",
@@ -151,9 +151,9 @@
         },
         "transparency": {
             "automatic": true,
-            "backgroundTransparency": 0.11,
-            "contentTransparency": 0.57,
-            "enable": true
+            "backgroundTransparency": 0.23339970589834483,
+            "contentTransparency": 0.6215411194293373,
+            "enable": false
         },
         "wallpaperTheming": {
             "enableAppsAndShell": true,
@@ -183,7 +183,8 @@
             "enable": false,
             "maxAllowed": 99,
             "maxAllowedIncrease": 10
-        }
+        },
+        "volumeStep": 2
     },
     "background": {
         "centeredWallpaper": true,
@@ -204,19 +205,23 @@
         },
         "screenList": [
         ],
+        "shareWidgetsAcrossScreens": false,
         "showGrid": true,
         "showSnapLines": true,
         "thumbnailPath": "",
         "wallpaperAnimation": "random",
         "wallpaperAnimationDuration": 1200,
-        "wallpaperPath": "/home/scruzd/Pictures/Inspo/wallhaven-yq2zwl.png",
+        "wallpaperPath": "/home/scruzd/Pictures/Inspo/wallhaven-yq9rwx.png",
         "widgets": {
             "calendar": {
                 "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "sizeMode": "2x2",
-                "x": 1740,
-                "y": 216
+                "x": 1596,
+                "y": 192
             },
             "clock": {
                 "color": "",
@@ -257,25 +262,33 @@
                     "followClock": false,
                     "text": ""
                 },
+                "screenList": [
+                ],
                 "showOnlyWhenLocked": false,
                 "style": "digital",
                 "styleLocked": "digital",
-                "x": 1800,
+                "x": 1668,
                 "y": 60
             },
             "customImage": {
                 "enable": false,
                 "path": "",
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "shape": "Cookie4Sided",
                 "size": 200,
-                "x": 400,
-                "y": 100
+                "x": 600,
+                "y": 228
             },
             "enableShadows": true,
             "images": {
                 "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "x": 36,
                 "y": 192
             },
@@ -283,16 +296,22 @@
                 "backgroundShape": "Cookie4Sided",
                 "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "showControls": true,
                 "showLyrics": false,
                 "showTitles": true,
-                "sizeMode": "1x3",
+                "sizeMode": "1x2",
                 "x": 1596,
-                "y": 960
+                "y": 456
             },
             "notes": {
                 "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "sizeMode": "2x2",
                 "x": 36,
                 "y": 456
@@ -300,33 +319,47 @@
             "resources": {
                 "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "vertical": false,
                 "x": 36,
                 "y": 60
             },
             "userCard": {
-                "enable": true,
+                "enable": false,
                 "placementStrategy": "free",
+                "screenList": [
+                    "DP-1"
+                ],
                 "sizeMode": "1x2",
                 "x": 36,
                 "y": 960
             },
             "visualizer": {
-                "enable": false,
+                "enable": true,
                 "placementStrategy": "free",
+                "screenList": [
+                    "HDMI-A-1"
+                ],
                 "x": 0,
-                "y": 0
+                "y": 840
             },
             "weather": {
                 "enable": false,
                 "placementStrategy": "free",
-                "sizeMode": "1x3",
-                "x": 1776,
+                "screenList": [
+                    "DP-1"
+                ],
+                "sizeMode": "1x1",
+                "x": 1720,
                 "y": 648
             },
             "worldClock": {
                 "enable": false,
                 "placementStrategy": "free",
+                "screenList": [
+                ],
                 "sizeMode": "2x2",
                 "timezones": [
                     "America/Santiago",
@@ -352,7 +385,7 @@
         },
         "borderless": true,
         "bottom": false,
-        "cornerStyle": 0,
+        "cornerStyle": 2,
         "divider": {
             "spacing": 20,
             "style": "rect"
@@ -369,27 +402,22 @@
         },
         "layouts": {
             "enable": true,
-            "grouping": "auto",
+            "grouping": "none",
             "leftLayout": [
                 "brightnessScroll",
                 "leftSidebarButton",
-                "workspaces",
-                "divisor",
-                "media"
+                "workspaces"
             ],
             "middleLayout": [
-                "divisor",
                 "launcherButton",
                 "docktoPanel"
             ],
             "rightLayout": [
                 "clockWidget",
                 "systemIcons",
-                "divisor",
-                "batteryIndicator",
+                "sysTray",
                 "powerButton",
                 "divisor",
-                "sysTray",
                 "volumeScroll"
             ]
         },
@@ -517,13 +545,17 @@
         "monochromeIcons": true,
         "pinnedApps": [
             "org.kde.dolphin",
+            "microsoft-edge",
+            "spotify",
+            "discord",
+            "steam",
             "kitty"
         ],
         "pinnedOnStartup": false,
-        "showAppsButton": true,
+        "showAppsButton": false,
         "showBackground": true,
         "showMedia": true,
-        "showPinButton": true
+        "showPinButton": false
     },
     "dropShelf": {
         "enable": true,
@@ -539,6 +571,16 @@
         },
         "autostartApps": {
             "apps": [
+                {
+                    "cmd": "/usr/bin/discord --url --",
+                    "delay": 0,
+                    "workspace": 1
+                },
+                {
+                    "cmd": "/usr/bin/steam",
+                    "delay": 0,
+                    "workspace": 1
+                }
             ],
             "enable": true
         },
@@ -565,6 +607,14 @@
         "input": {
             "followMouse": 1,
             "kbLayout": "us",
+            "kbOptions": "",
+            "kbVariant": "",
+            "mouse": {
+                "accelProfile": "flat",
+                "leftHanded": false,
+                "naturalScroll": false,
+                "sensitivity": -0.51
+            },
             "numlock": true,
             "repeatDelay": 250,
             "repeatRate": 35,
@@ -572,7 +622,7 @@
                 "clickfingerBehavior": false,
                 "disableWhileTyping": true,
                 "naturalScroll": false,
-                "scrollFactor": 0.7
+                "scrollFactor": 0.5
             }
         }
     },
@@ -591,7 +641,7 @@
         "translator": {
             "engine": "auto",
             "sourceLanguage": "auto",
-            "targetLanguage": "auto"
+            "targetLanguage": "Español"
         },
         "ui": "es_MX"
     },
@@ -753,12 +803,12 @@
             },
             "connectPort": 8891,
             "reminders": {
-                "addNewTasksToApple": false,
+                "addNewTasksToApple": true,
                 "enable": true,
                 "listUrl": "",
                 "refreshMinutes": 15
             },
-            "user": ""
+            "user": "sebastian.cruzd@proton.me"
         },
         "google": {
             "calendar": {
@@ -779,9 +829,19 @@
         },
         "mail": {
             "accounts": [
+                {
+                    "enable": true,
+                    "host": "imap.gmail.com",
+                    "id": "gmail-sebac-d73-gmail-com",
+                    "label": "sebac.d73@gmail.com",
+                    "mailbox": "INBOX",
+                    "port": 993,
+                    "security": "ssl",
+                    "user": "sebac.d73@gmail.com"
+                }
             ],
             "connectPort": 8892,
-            "enable": false,
+            "enable": true,
             "host": "imap.gmail.com",
             "mailbox": "INBOX",
             "maxMessages": 15,
@@ -883,6 +943,10 @@
                         "type": "idleInhibitor"
                     },
                     {
+                        "size": 2,
+                        "type": "nightLight"
+                    },
+                    {
                         "size": 1,
                         "type": "mic"
                     },
@@ -891,8 +955,36 @@
                         "type": "audio"
                     },
                     {
-                        "size": 2,
-                        "type": "nightLight"
+                        "size": 1,
+                        "type": "easyEffects"
+                    },
+                    {
+                        "size": 1,
+                        "type": "cloudflareWarp"
+                    },
+                    {
+                        "size": 1,
+                        "type": "screenSnip"
+                    },
+                    {
+                        "size": 1,
+                        "type": "colorPicker"
+                    },
+                    {
+                        "size": 1,
+                        "type": "musicRecognition"
+                    },
+                    {
+                        "size": 1,
+                        "type": "notifications"
+                    },
+                    {
+                        "size": 1,
+                        "type": "powerProfile"
+                    },
+                    {
+                        "size": 1,
+                        "type": "onScreenKeyboard"
                     }
                 ]
             },
@@ -929,6 +1021,8 @@
         "battery": true,
         "pomodoro": true,
         "theme": "freedesktop"
+    },
+    "thumbnailPathByMonitor": {
     },
     "time": {
         "dateFormat": "ddd, dd/MM",
@@ -993,11 +1087,15 @@
             "switchHandlePositionFix": true
         }
     },
+    "wallpaperPathByMonitor": {
+        "DP-1": "/home/scruzd/Pictures/Inspo/wallhaven-1q21jw.jpg",
+        "HDMI-A-1": "/home/scruzd/Pictures/Inspo/wallhaven-lydwpr.jpg"
+    },
     "wallpaperSelector": {
         "changeInterval": 0,
         "closeAfterSelection": true,
         "columns": 4,
-        "liveWallpapersPath": "",
+        "liveWallpapersPath": "/home/scruzd/Pictures/wallpapers/animados",
         "online": {
             "category": "general",
             "enable": true,

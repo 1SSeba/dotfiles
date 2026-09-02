@@ -45,18 +45,24 @@ ContentPage {
             "decoration:blur:passes":               h.decoration.blur.passes,
             "decoration:shadow:enabled":            h.decoration.shadow.enabled ? 1 : 0,
             "decoration:shadow:range":              h.decoration.shadow.range,
-            "decoration:active_opacity":            h.decoration.activeOpacity,
-            "decoration:inactive_opacity":          h.decoration.inactiveOpacity,
+            "decoration:active_opacity":            Config.options.appearance.transparency.enable ? h.decoration.activeOpacity : 1,
+            "decoration:inactive_opacity":          Config.options.appearance.transparency.enable ? h.decoration.inactiveOpacity : 1,
             "general:border_size":                  h.general.borderSize,
             "general:gaps_in":                      h.general.gapsIn,
             "general:gaps_out":                     h.general.gapsOut,
             "general:layout":                       h.general.layout,
             "animations:enabled":                   h.animations.enable ? 1 : 0,
             "input:kb_layout":                      h.input.kbLayout,
+            "input:kb_variant":                     h.input.kbVariant,
+            "input:kb_options":                     h.input.kbOptions,
             "input:numlock_by_default":             h.input.numlock ? 1 : 0,
             "input:repeat_delay":                   h.input.repeatDelay,
             "input:repeat_rate":                    h.input.repeatRate,
             "input:follow_mouse":                   h.input.followMouse,
+            "input:natural_scroll":                 h.input.mouse.naturalScroll ? 1 : 0,
+            "input:left_handed":                    h.input.mouse.leftHanded ? 1 : 0,
+            "input:sensitivity":                    h.input.mouse.sensitivity,
+            "input:accel_profile":                  h.input.mouse.accelProfile,
             "input:touchpad:natural_scroll":        h.input.touchpad.naturalScroll ? 1 : 0,
             "input:touchpad:disable_while_typing":  h.input.touchpad.disableWhileTyping ? 1 : 0,
             "input:touchpad:clickfinger_behavior":  h.input.touchpad.clickfingerBehavior ? 1 : 0,
@@ -72,115 +78,6 @@ ContentPage {
         spacing: 20
 
         // Displays
-        ContentSection {
-            icon: "monitor"
-            shape: MaterialShape.Shape.ClamShell
-            title: Translation.tr("Displays")
-            visible: monitorConfig.monitors.length > 0
-
-            MonitorCanvas {
-                id: monitorCanvas
-                Layout.fillWidth: true
-                monitorConfig: monitorConfig
-            }
-
-            ContentSubsection {
-                Layout.topMargin: 10
-                title: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.name ?? "")
-                    + " · "
-                    + (monitorConfig.monitors[monitorCanvas.selectedIndex]?.description ?? "")
-
-                GroupedList {
-                    ConfigSwitch {
-                        buttonIcon: "tv_off"
-                        text: Translation.tr("Enabled")
-                        checked: !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)
-                        onCheckedChanged: {
-                            if (checked === !(monitorConfig.monitors[monitorCanvas.selectedIndex]?.disabled ?? false)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { disabled: !checked })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
-
-                    ConfigComboBox {
-                        Layout.fillWidth: true
-                        buttonIcon: "aspect_ratio"
-                        text: Translation.tr("Resolution & Refresh Rate")
-                        textRole: "display"
-                        model: (monitorConfig.monitors[monitorCanvas.selectedIndex]?.availableModes ?? [])
-                            .map(mode => ({ display: mode, value: mode }))
-                        currentValue: monitorConfig.monitors[monitorCanvas.selectedIndex]?.currentMode ?? ""
-                        onSelected: newValue => {
-                            const mode = newValue
-                            const parts = mode.match(/(\d+)x(\d+)@([\d.]+)Hz/)
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, {
-                                currentMode: mode,
-                                width: parseInt(parts[1]),
-                                height: parseInt(parts[2]),
-                                refreshRate: parseFloat(parts[3])
-                            })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
-
-                    ContentSubsection {
-                        title: Translation.tr("Orientation")
-                        Layout.fillWidth: true
-
-                        ConfigSelectionArray {
-                            currentValue: monitorConfig.monitors[monitorCanvas.selectedIndex]?.transform ?? 0
-                            onSelected: newValue => {
-                                monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { transform: newValue })
-                                monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                            }
-                            options: [
-                                { displayName: Translation.tr("Normal"), icon: "screen_rotation_alt", value: 0 },
-                                { displayName: "90°",                    icon: "rotate_90_degrees_cw",  value: 1 },
-                                { displayName: "180°",                   icon: "screen_rotation",       value: 2 },
-                                { displayName: "270°",                   icon: "rotate_90_degrees_ccw", value: 3 },
-                            ]
-                        }
-                    }
-    
-                    ConfigSpinBox {
-                        icon: "zoom_in"
-                        text: Translation.tr("Scale")
-                        value: Math.round((monitorConfig.monitors[monitorCanvas.selectedIndex]?.scale ?? 1.0) * 100)
-                        from: 50; to: 300; stepSize: 25
-                        onValueChanged: {
-                            const newVal = value / 100.0
-                            if (newVal === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.scale ?? 1.0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { scale: newVal })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
-
-                    ConfigSpinBox {
-                        icon: "swap_horiz"
-                        text: Translation.tr("Position X")
-                        value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0
-                        from: 0; to: 7680; stepSize: 1
-                        onValueChanged: {
-                            if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.x ?? 0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { x: value })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
-
-                    ConfigSpinBox {
-                        icon: "swap_vert"
-                        text: Translation.tr("Position Y")
-                        value: monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0
-                        from: 0; to: 4320; stepSize: 1
-                        onValueChanged: {
-                            if (value === (monitorConfig.monitors[monitorCanvas.selectedIndex]?.y ?? 0)) return
-                            monitorConfig.updateMonitor(monitorCanvas.selectedIndex, { y: value })
-                            monitorConfig.applyAndSave(monitorCanvas.selectedIndex)
-                        }
-                    }
-                }        
-            }
-        }
 
         // Layout
         ContentSection {
@@ -210,140 +107,8 @@ ContentPage {
         }
 
         // Input
-        ContentSection {
-            icon: "trackpad_input"
-            shape: MaterialShape.Shape.Pentagon
-            title: Translation.tr("Input")
 
-            ContentSubsection {
-                title: Translation.tr("Keyboard")
-
-                GroupedList {
-                    ConfigTextArea {
-                        id: kbLayoutField
-                        Layout.fillWidth: true
-                        buttonIcon: "keyboard"
-                        text: Translation.tr("Keyboard layout")
-                        placeholderText: Translation.tr("e.g., us, es, latam")
-                        Component.onCompleted: value = Config.options.hyprland.input.kbLayout
-                        onValueChanged: kbLayoutDebounceTimer.restart()
-
-                        Timer {
-                            id: kbLayoutDebounceTimer
-                            interval: 1000
-                            repeat: false
-                            onTriggered: {
-                                Config.options.hyprland.input.kbLayout = kbLayoutField.value
-                                HyprlandConfig.set("input:kb_layout", kbLayoutField.value)
-                            }
-                        }
-                    }
-                    ConfigSwitch {
-                        buttonIcon: "numbers"
-                        text: Translation.tr("Numlock by default")
-                        checked: Config.options.hyprland.input.numlock
-                        onCheckedChanged: {
-                            if (checked === Config.options.hyprland.input.numlock) return
-                            Config.options.hyprland.input.numlock = checked
-                            HyprlandConfig.set("input:numlock_by_default", checked ? 1 : 0)
-                        }
-                    }
-
-                    ConfigSpinBox {
-                        icon: "keyboard_return"
-                        text: Translation.tr("Repeat delay (ms)")
-                        value: Config.options.hyprland.input.repeatDelay
-                        from: 100; to: 1000; stepSize: 10
-                        onValueChanged: {
-                            if (value === Config.options.hyprland.input.repeatDelay) return
-                            Config.options.hyprland.input.repeatDelay = value
-                            HyprlandConfig.set("input:repeat_delay", value)
-                        }
-                    }
-
-                    ConfigSpinBox {
-                        icon: "speed"
-                        text: Translation.tr("Repeat rate")
-                        value: Config.options.hyprland.input.repeatRate
-                        from: 10; to: 100; stepSize: 1
-                        onValueChanged: {
-                            if (value === Config.options.hyprland.input.repeatRate) return
-                            Config.options.hyprland.input.repeatRate = value
-                            HyprlandConfig.set("input:repeat_rate", value)
-                        }
-                    }
-                    ContentSubsection {
-                        title: Translation.tr("Follow mouse")
-                        Layout.fillWidth: true
-
-                        ConfigSelectionArray {
-                            currentValue: Config.options.hyprland.input.followMouse
-                            onSelected: newValue => {
-                                Config.options.hyprland.input.followMouse = newValue
-                                HyprlandConfig.set("input:follow_mouse", newValue)
-                            }
-                            options: [
-                                { displayName: Translation.tr("Disabled"), icon: "mouse",     value: 0 },
-                                { displayName: Translation.tr("Full"),     icon: "open_with",  value: 1 },
-                                { displayName: Translation.tr("Loose"),    icon: "drag_pan",   value: 2 },
-                                { displayName: Translation.tr("Explicit"), icon: "ads_click",  value: 3 },
-                            ]
-                        }
-                    }
-                }
-            }
-
-            ContentSubsection {
-                title: Translation.tr("Touchpad")
-                GroupedList {
-                    ConfigSwitch {
-                        buttonIcon: "swap_vert"
-                        text: Translation.tr("Natural scroll")
-                        checked: Config.options.hyprland.input.touchpad.naturalScroll
-                        onCheckedChanged: {
-                            if (checked === Config.options.hyprland.input.touchpad.naturalScroll) return
-                            Config.options.hyprland.input.touchpad.naturalScroll = checked
-                            HyprlandConfig.set("input:touchpad:natural_scroll", checked ? 1 : 0)
-                        }
-                    }
-
-                    ConfigSwitch {
-                        buttonIcon: "keyboard_hide"
-                        text: Translation.tr("Disable while typing")
-                        checked: Config.options.hyprland.input.touchpad.disableWhileTyping
-                        onCheckedChanged: {
-                            if (checked === Config.options.hyprland.input.touchpad.disableWhileTyping) return
-                            Config.options.hyprland.input.touchpad.disableWhileTyping = checked
-                            HyprlandConfig.set("input:touchpad:disable_while_typing", checked ? 1 : 0)
-                        }
-                    }
-
-                    ConfigSwitch {
-                        buttonIcon: "touch_app"
-                        text: Translation.tr("Clickfinger behavior")
-                        checked: Config.options.hyprland.input.touchpad.clickfingerBehavior
-                        onCheckedChanged: {
-                            if (checked === Config.options.hyprland.input.touchpad.clickfingerBehavior) return
-                            Config.options.hyprland.input.touchpad.clickfingerBehavior = checked
-                            HyprlandConfig.set("input:touchpad:clickfinger_behavior", checked ? 1 : 0)
-                        }
-                    }
-
-                    ConfigSpinBox {
-                        icon: "swipe"
-                        text: Translation.tr("Scroll factor")
-                        value: Math.round(Config.options.hyprland.input.touchpad.scrollFactor * 10)
-                        from: 1; to: 30; stepSize: 1
-                        onValueChanged: {
-                            const newVal = value / 10.0
-                            if (newVal === Config.options.hyprland.input.touchpad.scrollFactor) return
-                            Config.options.hyprland.input.touchpad.scrollFactor = newVal
-                            HyprlandConfig.set("input:touchpad:scroll_factor", newVal)
-                        }
-                    }
-                }
-            }
-        }
+        // Audio
 
         // Visual & Aesthetics
         ContentSection {
@@ -459,29 +224,87 @@ ContentPage {
                     }
                 }
 
+                ConfigRow {
+                    ConfigSwitch {
+                        buttonIcon: "ev_shadow"
+                        text: Translation.tr("Transparency")
+                        checked: Config.options.appearance.transparency.enable
+                        onCheckedChanged: {
+                            Config.options.appearance.transparency.enable = checked;
+                            // Single master switch: also gate real window opacity in
+                            // Hyprland, not just the shell's own panels.
+                            HyprlandConfig.setMany({
+                                "decoration:active_opacity": checked ? Config.options.hyprland.decoration.activeOpacity : 1,
+                                "decoration:inactive_opacity": checked ? Config.options.hyprland.decoration.inactiveOpacity : 1
+                            });
+                        }
+                    }
+                    ConfigSwitch {
+                        buttonIcon: "autofps_select"
+                        enabled: Config.options.appearance.transparency.enable
+                        text: Translation.tr("Automatic")
+                        checked: Config.options.appearance.transparency.automatic
+                        onCheckedChanged: {
+                            Config.options.appearance.transparency.automatic = checked;
+                        }
+                    }
+                }
+
+                ConfigSlider {
+                    Layout.fillWidth: true
+                    buttonIcon: "opacity"
+                    text: Translation.tr("Background transparency")
+                    enabled: Config.options.appearance.transparency.enable && !Config.options.appearance.transparency.automatic
+                    value: Config.options.appearance.transparency.backgroundTransparency
+                    from: 0
+                    to: 1
+                    onValueChanged: {
+                        Config.options.appearance.transparency.backgroundTransparency = value;
+                    }
+                }
+
+                ConfigSlider {
+                    Layout.fillWidth: true
+                    buttonIcon: "opacity"
+                    text: Translation.tr("Content transparency")
+                    enabled: Config.options.appearance.transparency.enable && !Config.options.appearance.transparency.automatic
+                    value: Config.options.appearance.transparency.contentTransparency
+                    from: 0
+                    to: 1
+                    onValueChanged: {
+                        Config.options.appearance.transparency.contentTransparency = value;
+                    }
+                }
+
                 ConfigSpinBox {
                     icon: "opacity"
                     text: Translation.tr("Active Opacity")
+                    enabled: Config.options.appearance.transparency.enable
                     value: Math.round(Config.options.hyprland.decoration.activeOpacity * 100)
                     from: 10; to: 100; stepSize: 5
                     onValueChanged: {
                         const newVal = value / 100.0
                         if (newVal === Config.options.hyprland.decoration.activeOpacity) return
                         Config.options.hyprland.decoration.activeOpacity = newVal
-                        HyprlandConfig.set("decoration:active_opacity", newVal)
+                        // Solo surte efecto mientras el switch maestro de arriba esté prendido.
+                        if (Config.options.appearance.transparency.enable)
+                            HyprlandConfig.set("decoration:active_opacity", newVal)
                     }
                 }
 
                 ConfigSpinBox {
                     icon: "opacity"
                     text: Translation.tr("Inactive Opacity")
+                    enabled: Config.options.appearance.transparency.enable
                     value: Math.round(Config.options.hyprland.decoration.inactiveOpacity * 100)
                     from: 10; to: 100; stepSize: 5
                     onValueChanged: {
                         const newVal = value / 100.0
                         if (newVal === Config.options.hyprland.decoration.inactiveOpacity) return
                         Config.options.hyprland.decoration.inactiveOpacity = newVal
-                        HyprlandConfig.set("decoration:inactive_opacity", newVal)
+                        // Solo surte efecto mientras el switch maestro de arriba esté prendido.
+                        if (Config.options.appearance.transparency.enable)
+                            HyprlandConfig.set("decoration:inactive_opacity", newVal)
                     }
                 }
             }

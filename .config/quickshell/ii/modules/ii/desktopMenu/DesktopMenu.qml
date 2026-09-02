@@ -31,16 +31,22 @@ Scope {
 
     function displayPathFor(path) {
         if (!path) return path
-        return /\.(mp4|webm|mkv|avi|mov)$/i.test(path)
-            ? Config.options.background.thumbnailPath
+        return Wallpapers.isVideoPath(path)
+            ? Wallpapers.effectiveThumbnailForMonitor(root.menuMonitorName)
             : path
     }
 
     // Wallpaper folder images
+    // El wallpaper "activo" para el menú es el del monitor sobre el que se hizo
+    // click derecho (`GlobalStates.desktopMenuScreen`), no necesariamente el global:
+    // ese monitor puede tener su propio wallpaper.
+    readonly property string menuMonitorName: GlobalStates.desktopMenuScreen?.name ?? ""
+    readonly property string effectiveWallpaperPath: Wallpapers.effectivePathForMonitor(root.menuMonitorName)
+
     FolderListModel {
         id: wallpaperFolder
         folder: {
-            const wallPath = Config.options.background.wallpaperPath
+            const wallPath = root.effectiveWallpaperPath
             if (!wallPath || wallPath.length === 0) return ""
             const lastSlash = wallPath.lastIndexOf("/")
             return "file://" + wallPath.substring(0, lastSlash)
@@ -52,7 +58,7 @@ Scope {
     property int carouselExtraCount: 5
     property bool useDarkMode: Appearance.m3colors.darkmode
     property var randomWallpapers: {
-        const current = FileUtils.trimFileProtocol(Config.options.background.wallpaperPath)
+        const current = FileUtils.trimFileProtocol(root.effectiveWallpaperPath)
         let all = []
         for (let i = 0; i < wallpaperFolder.count; i++) {
             const fp = FileUtils.trimFileProtocol(wallpaperFolder.get(i, "filePath").toString())
@@ -66,7 +72,7 @@ Scope {
     }
 
     property var carouselModel: {
-        const current = FileUtils.trimFileProtocol(Config.options.background.wallpaperPath)
+        const current = FileUtils.trimFileProtocol(root.effectiveWallpaperPath)
         if (!current || current.length === 0) return randomWallpapers.map(p => root.displayPathFor(p))
         return [root.displayPathFor(current), ...randomWallpapers.map(p => root.displayPathFor(p))]
     }
@@ -156,7 +162,7 @@ Scope {
                             anchors.margins: 10
                             model: root.carouselModel
                             onWallpaperSelected: (path) => {
-                                Wallpapers.select(path, Appearance.m3colors.darkmode)
+                                Wallpapers.select(path, Appearance.m3colors.darkmode, root.menuMonitorName)
                                 GlobalStates.desktopMenuOpen = false
                             }
                         }

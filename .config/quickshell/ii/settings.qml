@@ -11,6 +11,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import Quickshell
+import Quickshell.Io
 import qs
 import qs.services
 import qs.modules.common
@@ -35,30 +36,55 @@ ApplicationWindow {
             component: "modules/settings/GeneralConfig.qml"
         },
         {
+            name: Translation.tr("Audio"),
+            icon: "volume_up",
+            component: "modules/settings/AudioConfig.qml"
+        },
+        {
+            name: Translation.tr("Video & Pantallas"),
+            icon: "desktop_windows",
+            component: "modules/settings/VideoConfig.qml"
+        },
+        {
+            name: Translation.tr("Teclado & Mouse"),
+            icon: "keyboard",
+            component: "modules/settings/InputConfig.qml"
+        },
+        {
             name: Translation.tr("Bar"),
             icon: "toast",
             iconRotation: 180,
             component: "modules/settings/BarConfig.qml"
         },
         {
-            name: Translation.tr("Background"),
-            icon: "texture",
-            component: "modules/settings/BackgroundConfig.qml"
+            name: Translation.tr("Dock"),
+            icon: "dock",
+            component: "modules/settings/DockConfig.qml"
+        },
+        {
+            name: Translation.tr("Sidebars"),
+            icon: "side_navigation",
+            component: "modules/settings/SidebarsConfig.qml"
+        },
+        {
+            name: Translation.tr("Sistema"),
+            icon: "bottom_app_bar",
+            component: "modules/settings/SystemConfig.qml"
+        },
+        {
+            name: Translation.tr("Wallpaper"),
+            icon: "wallpaper",
+            component: "modules/settings/WallpaperConfig.qml"
+        },
+        {
+            name: Translation.tr("Widgets de escritorio"),
+            icon: "widgets",
+            component: "modules/settings/DesktopWidgetsConfig.qml"
         },
         {
             name: Translation.tr("Hyprland"),
             icon: "tune",
             component: "modules/settings/HyprlandPage.qml"
-        },
-        {
-            name: Translation.tr("Interface"),
-            icon: "bottom_app_bar",
-            component: "modules/settings/InterfaceConfig.qml"
-        },
-        {
-            name: Translation.tr("Sidebar"),
-            icon: "side_navigation",
-            component: "modules/settings/SidebarConfig.qml"
         },
         {
             name: Translation.tr("Services"),
@@ -91,6 +117,30 @@ ApplicationWindow {
         MaterialThemeLoader.reapplyTheme()
         Config.readWriteDelay = 0 // Settings app always only sets one var at a time so delay isn't needed
         GlobalStates.settingsOpen = true
+    }
+
+    // Quien nos lanzó (p. ej. el botón de settings del sidebar de IA) puede
+    // pedir arrancar en una página puntual: lo escribe en un archivo antes de
+    // ejecutar `qs -p settings.qml` (ver Ai.openAccountsSettings /
+    // Directories.settingsTargetPagePath), porque este proceso no comparte
+    // estado en caliente con la shell. Lo leemos acá y lo borramos apenas se
+    // consume, así un "Settings" normal (sin pedir nada puntual) sigue
+    // arrancando en Quick como siempre.
+    FileView {
+        id: targetPageFile
+        path: Directories.settingsTargetPagePath
+        watchChanges: false
+        onLoadedChanged: {
+            if (!loaded) return;
+            const component = text().trim();
+            if (component.length > 0) {
+                const idx = root.pages.findIndex(p => p.component === component);
+                if (idx >= 0) root.currentPage = idx;
+            }
+            Quickshell.execDetached(["rm", "-f", Directories.settingsTargetPagePath]);
+        }
+        // Sin archivo (abriste Settings normal): no hay nada que leer, seguimos en Quick.
+        onLoadFailed: error => {}
     }
 
     // Varias páginas y servicios piden cerrar la app apagando este flag
@@ -231,27 +281,36 @@ ApplicationWindow {
                         }
                     }
 
-                    NavigationRailTabArray {
-                        currentIndex: root.currentPage
-                        expanded: navRail.expanded
-                        Repeater {
-                            model: root.pages
-                            NavigationRailButton {
-                                required property var index
-                                required property var modelData
-                                toggled: root.currentPage === index
-                                onPressed: root.currentPage = index;
-                                expanded: navRail.expanded
-                                buttonIcon: modelData.icon
-                                buttonIconRotation: modelData.iconRotation || 0
-                                buttonText: modelData.name
-                                showToggledHighlight: false
+                    // La lista de páginas no entraba en ventanas chicas o con muchos
+                    // ítems: se recortaba sin dar ningún indicio de que faltaba scroll.
+                    StyledFlickable {
+                        id: navRailScroll
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        contentWidth: width
+                        contentHeight: tabArray.implicitHeight
+
+                        NavigationRailTabArray {
+                            id: tabArray
+                            width: navRailScroll.width
+                            currentIndex: root.currentPage
+                            expanded: navRail.expanded
+                            Repeater {
+                                model: root.pages
+                                NavigationRailButton {
+                                    required property var index
+                                    required property var modelData
+                                    toggled: root.currentPage === index
+                                    onPressed: root.currentPage = index;
+                                    expanded: navRail.expanded
+                                    buttonIcon: modelData.icon
+                                    buttonIconRotation: modelData.iconRotation || 0
+                                    buttonText: modelData.name
+                                    showToggledHighlight: false
+                                }
                             }
                         }
-                    }
-
-                    Item {
-                        Layout.fillHeight: true
                     }
                 }
             }

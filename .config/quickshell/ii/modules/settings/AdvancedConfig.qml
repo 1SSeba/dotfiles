@@ -103,89 +103,51 @@ ContentPage {
     }
 
     ContentSection {
-        icon: "colors"
-        title: Translation.tr("Color generation")
+        icon: "tune"
+        title: Translation.tr("Panel de ajustes")
 
-        ConfigSwitch {
-            buttonIcon: "hardware"
-            text: Translation.tr("Shell & utilities")
-            checked: Config.options.appearance.wallpaperTheming.enableAppsAndShell
-            onCheckedChanged: {
-                Config.options.appearance.wallpaperTheming.enableAppsAndShell = checked;
+        ConfigSelectionArray {
+            Layout.fillWidth: false
+            currentValue: Config.options.settings.style
+            onSelected: newValue => {
+                Config.options.settings.style = newValue;
             }
-        }
-        ConfigSwitch {
-            buttonIcon: "tv_options_input_settings"
-            text: Translation.tr("Qt apps")
-            checked: Config.options.appearance.wallpaperTheming.enableQtApps
-            onCheckedChanged: {
-                Config.options.appearance.wallpaperTheming.enableQtApps = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Shell & utilities theming must also be enabled")
-            }
-        }
-        ConfigSwitch {
-            buttonIcon: "terminal"
-            text: Translation.tr("Terminal")
-            checked: Config.options.appearance.wallpaperTheming.enableTerminal
-            onCheckedChanged: {
-                Config.options.appearance.wallpaperTheming.enableTerminal = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Shell & utilities theming must also be enabled")
-            }
-        }
-        ConfigRow {
-            uniform: true
-            ConfigSwitch {
-                buttonIcon: "dark_mode"
-                text: Translation.tr("Force dark mode in terminal")
-                checked: Config.options.appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode
-                onCheckedChanged: {
-                     Config.options.appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode= checked;
+            options: [
+                {
+                    displayName: Translation.tr("Completo"),
+                    icon: "settings_panorama",
+                    value: "default"
+                },
+                {
+                    displayName: Translation.tr("Minimalista"),
+                    icon: "settings_heart",
+                    value: "minimal"
                 }
-                StyledToolTip {
-                    text: Translation.tr("Ignored if terminal theming is not enabled")
-                }
-            }
+            ]
         }
 
         ConfigSpinBox {
-            icon: "invert_colors"
-            text: Translation.tr("Terminal: Harmony (%)")
-            value: Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmony * 100
+            icon: "border_style"
+            text: Translation.tr("Grosor del borde")
+            value: Config.options.settings.borderSize
             from: 0
-            to: 100
-            stepSize: 10
+            to: 10
+            stepSize: 1
             onValueChanged: {
-                Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmony = value / 100;
+                Config.options.settings.borderSize = value;
             }
         }
-        ConfigSpinBox {
-            icon: "gradient"
-            text: Translation.tr("Terminal: Harmonize threshold")
-            value: Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold
-            from: 0
-            to: 100
-            stepSize: 10
-            onValueChanged: {
-                Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold = value;
-            }
-        }
-        ConfigSpinBox {
-            icon: "format_color_text"
-            text: Translation.tr("Terminal: Foreground boost (%)")
-            value: Config.options.appearance.wallpaperTheming.terminalGenerationProps.termFgBoost * 100
-            from: 0
-            to: 100
-            stepSize: 10
-            onValueChanged: {
-                Config.options.appearance.wallpaperTheming.terminalGenerationProps.termFgBoost = value / 100;
+
+        ColorSelectionArray {
+            icon: "format_paint"
+            text: Translation.tr("Color del borde")
+            enabled: Config.options.settings.borderSize > 0
+            options: ["primary", "secondary", "tertiary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "layer0Border"]
+            currentValue: Config.options.settings.borderColor
+            onSelected: newValue => {
+                Config.options.settings.borderColor = newValue;
             }
         }
     }
-
-
 
 }

@@ -221,6 +221,8 @@ Singleton {
                     property real maxAllowedIncrease: 10
                     property real maxAllowed: 99
                 }
+                // Cuánto sube/baja el volumen por scroll/tecla, en %
+                property real volumeStep: 2
             }
 
             property JsonObject apps: JsonObject {
@@ -266,10 +268,18 @@ Singleton {
                 }
                 property JsonObject input: JsonObject {
                     property string kbLayout: "us"
+                    property string kbVariant: ""
+                    property string kbOptions: ""
                     property bool numlock: true
                     property int repeatDelay: 250
                     property int repeatRate: 35
                     property int followMouse: 1
+                    property JsonObject mouse: JsonObject {
+                        property bool naturalScroll: false
+                        property bool leftHanded: false
+                        property real sensitivity: 0.0
+                        property string accelProfile: "" // "", "adaptive", "flat"
+                    }
                     property JsonObject touchpad: JsonObject {
                         property bool naturalScroll: false
                         property bool disableWhileTyping: true
@@ -301,11 +311,20 @@ Singleton {
                 property bool showSnapLines: true
                 // Grilla de puntos mientras arrastrás un widget
                 property bool showGrid: true
+                // Al prender un widget apagado desde el menú del click derecho,
+                // por defecto queda exclusivo del monitor donde se clickeó.
+                // Con esto en true, en cambio, aparece en todos los monitores
+                // (comportamiento viejo).
+                property bool shareWidgetsAcrossScreens: false
                 property JsonObject widgets: JsonObject {
                     // Sombra bajo los widgets, para que se lean sobre fondos claros
                     property bool enableShadows: true
                     property JsonObject clock: JsonObject {
                         property bool enable: true
+                        // En qué monitores se muestra ESTE widget (vacío = todos los que ya
+                        // pasen `background.screenList`). Es independiente del resto de los
+                        // widgets: cada uno puede vivir en una pantalla distinta.
+                        property list<string> screenList: []
                         property bool showOnlyWhenLocked: false
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
@@ -353,6 +372,7 @@ Singleton {
                     }
                     property JsonObject weather: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
@@ -361,6 +381,7 @@ Singleton {
 
                     property JsonObject calendar: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
@@ -368,6 +389,7 @@ Singleton {
                     }
                     property JsonObject resources: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free" // "free", "leastBusy", "mostBusy"
                         property real x: 400
                         property real y: 100
@@ -375,6 +397,7 @@ Singleton {
                     }
                     property JsonObject userCard: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -382,6 +405,7 @@ Singleton {
                     }
                     property JsonObject media: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property bool showControls: true
                         property bool showLyrics: false
                         property bool showTitles: true
@@ -393,12 +417,14 @@ Singleton {
                     }
                     property JsonObject visualizer: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free"
                         property real x: 0
                         property real y: 0
                     }
                     property JsonObject customImage: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -408,12 +434,14 @@ Singleton {
                     }
                     property JsonObject images: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
                     }
                     property JsonObject notes: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
@@ -421,6 +449,7 @@ Singleton {
                     }
                     property JsonObject worldClock: JsonObject {
                         property bool enable: false
+                        property list<string> screenList: []
                         property list<string> timezones: ["America/Santiago", "America/Argentina/Buenos_Aires", "Europe/Madrid", "America/New_York"]
                         property string placementStrategy: "free"
                         property real x: 400
@@ -459,6 +488,18 @@ Singleton {
                     property real widgetsFactor: 1.2
                 }
             }
+
+            // Wallpaper por monitor: { "DP-1": "/ruta/a.png", "HDMI-A-1": "/ruta/b.mp4" }.
+            // Un monitor sin entrada acá cae a `background.wallpaperPath` (el de "todos los
+            // monitores"). OJO: tienen que vivir acá, en la raíz del adapter, y NO adentro de
+            // `background` — JsonAdapter tiene un bug (lee/escribe sobre el objeto raíz en vez
+            // del JsonObject anidado) que hace que una `property var` anidada nunca se actualice
+            // al recargar el archivo desde afuera (p. ej. cuando switchwall.sh lo reescribe).
+            // A nivel raíz sí funciona, porque ahí raíz y "objeto anidado" son el mismo objeto.
+            property var wallpaperPathByMonitor: ({})
+            // Miniatura (frame fijo) de cada wallpaper de video en wallpaperPathByMonitor,
+            // misma forma que arriba pero por monitor. Mismo motivo para vivir en la raíz.
+            property var thumbnailPathByMonitor: ({})
 
             property JsonObject bar: JsonObject {
                 property JsonObject autoHide: JsonObject {

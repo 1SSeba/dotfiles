@@ -643,6 +643,19 @@ Singleton {
         }
     }
 
+    /**
+     * Abre la app de Settings directo en "Servicios" (donde vive Proveedores:
+     * login de Claude Code, keys de Gemini/OpenAI). Settings corre en su
+     * propio proceso (`qs -p settings.qml`), así que no hay forma de
+     * empujarle el estado en caliente: se lo dejamos escrito en un archivo
+     * que la propia app lee al arrancar y borra apenas lo consume (ver
+     * Directories.settingsTargetPagePath).
+     */
+    function openAccountsSettings() {
+        Quickshell.execDetached(["bash", "-c",
+            `mkdir -p "$(dirname '${Directories.settingsTargetPagePath}')" && printf '%s' 'modules/settings/ServicesConfig.qml' > '${Directories.settingsTargetPagePath}' && exec qs -p '${Quickshell.shellPath("settings.qml")}'`]);
+    }
+
     function setupCommand(args) {
         if (!args || args.length === 0 || String(args[0]).trim().length === 0) {
             root.printSetup();

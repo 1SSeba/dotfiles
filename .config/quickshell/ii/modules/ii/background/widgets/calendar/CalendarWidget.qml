@@ -64,29 +64,45 @@ AbstractBackgroundWidget {
         return d
     }
 
+    // Misma clave que usa Calendars.eventsByDate (services/Calendars.qml):
+    // YYYY-MM-DD en hora local. A mano y no con toISOString() porque ese
+    // convierte a UTC y corre el día (ver calendar_layout.js).
+    function localDateKey(d) {
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return d.getFullYear() + '-' + month + '-' + day
+    }
+
     function getMonthMatrix(date) {
         const year  = date.getFullYear()
         const month = date.getMonth()
         const firstOfMonth   = new Date(year, month, 1)
         const startOffset    = (firstOfMonth.getDay() + 6) % 7
         const daysInMonth    = new Date(year, month + 1, 0).getDate()
-        const daysInPrevMonth = new Date(year, month, 0).getDate()
 
         let cells = []
-        for (let i = 0; i < startOffset; i++)
-            cells.push({ day: daysInPrevMonth - startOffset + i + 1, currentMonth: false, isToday: false })
+        // El día 0 (y negativos) de un mes es el último (y anteriores) del
+        // mes de antes: Date los normaliza solo, no hace falta calcular
+        // cuántos días tenía el mes anterior a mano.
+        for (let i = startOffset; i > 0; i--) {
+            const d = new Date(year, month, 1 - i, 12)
+            cells.push({ day: d.getDate(), currentMonth: false, isToday: false, dateKey: root.localDateKey(d) })
+        }
 
-        for (let d = 1; d <= daysInMonth; d++) {
+        for (let day = 1; day <= daysInMonth; day++) {
+            const d = new Date(year, month, day, 12)
             const isToday = monthShift === 0
-                && d === today.getDate()
+                && day === today.getDate()
                 && month === today.getMonth()
                 && year  === today.getFullYear()
-            cells.push({ day: d, currentMonth: true, isToday: isToday })
+            cells.push({ day: day, currentMonth: true, isToday: isToday, dateKey: root.localDateKey(d) })
         }
 
         let nextDay = 1
         while (cells.length < 42) {
-            cells.push({ day: nextDay++, currentMonth: false, isToday: false })
+            const d = new Date(year, month + 1, nextDay, 12)
+            cells.push({ day: d.getDate(), currentMonth: false, isToday: false, dateKey: root.localDateKey(d) })
+            nextDay++
         }
 
         let weeks = []
@@ -105,6 +121,48 @@ AbstractBackgroundWidget {
 
     property var weeks: getMonthMatrix(viewingDate)
 
+    // Nombres cortos ("ene", "feb"...) para que entren en la grilla del
+    // selector; con el nombre completo no cabían tres por fila.
+    readonly property var monthNames: {
+        let names = []
+        for (let m = 0; m < 12; m++) names.push(Qt.locale().monthName(m, Locale.ShortFormat))
+        return names
+    }
+
+    // Salta directo a un mes/año en vez de ir de a uno con las flechas.
+    function goToMonth(year, month) {
+        const t = new Date()
+        root.monthShift = (year - t.getFullYear()) * 12 + (month - t.getMonth())
+    }
+
+    property bool showMonthYearPicker: false
+    property int pickerYear: today.getFullYear()
+
+    function openMonthYearPicker() {
+        root.pickerYear = root.viewingDate.getFullYear()
+        root.showMonthYearPicker = true
+    }
+
+    // Los widgets del escritorio pueden desbloquearse en cualquier momento
+    // (para reacomodarlos); si eso pasa con el selector abierto, mejor
+    // cerrarlo que dejarlo compitiendo con el arrastre del widget.
+    readonly property bool widgetsLocked: Config.options.background.widgetsLocked
+    onWidgetsLockedChanged: if (!widgetsLocked) root.showMonthYearPicker = false
+
+    /**
+     * Al cambiar de mes hay que asegurarse de que Calendars ya tenga esos
+     * eventos. `ensureWindow` no pide nada si la ventana actual ya los
+     * cubría, así que se puede llamar sin miedo en cada cambio.
+     */
+    function syncEventWindow() {
+        if (!Calendars.enabled) return
+        const first = new Date(root.viewingDate.getFullYear(), root.viewingDate.getMonth() - 1, 1)
+        const last = new Date(root.viewingDate.getFullYear(), root.viewingDate.getMonth() + 2, 1)
+        Calendars.ensureWindow(first, last)
+    }
+    onViewingDateChanged: root.syncEventWindow()
+    Component.onCompleted: root.syncEventWindow()
+
     implicitWidth:  card.implicitWidth
     implicitHeight: card.implicitHeight
 
@@ -113,10 +171,14 @@ AbstractBackgroundWidget {
     }
 
     component DayCell: Rectangle {
+        id: cell
         property int day: 0
         property bool currentMonth: true
         property bool isToday: false
         property bool bold: false
+        property string dateKey: ""
+        property var events: []
+        readonly property int eventCount: cell.events?.length ?? 0
 
         implicitWidth: 28
         implicitHeight: 28
@@ -125,13 +187,45 @@ AbstractBackgroundWidget {
 
         StyledText {
             anchors.centerIn: parent
-            text: parent.day
+            anchors.verticalCenterOffset: cell.eventCount > 0 ? -3 : 0
+            text: cell.day
             font.pixelSize: Appearance.font.pixelSize.smaller
-            font.weight: parent.bold || parent.isToday ? Font.Bold : Font.Normal
-            color: parent.isToday
+            font.weight: cell.bold || cell.isToday ? Font.Bold : Font.Normal
+            color: cell.isToday
                 ? Appearance.colors.colOnPrimary
                 : Appearance.colors.colOnLayer0
-            opacity: parent.currentMonth ? 1.0 : 0.3
+            opacity: cell.currentMonth ? 1.0 : 0.3
+        }
+
+        // Un punto por evento, hasta tres. Igual que en el calendario del
+        // sidebar (CalendarDayButton): más que eso no se distingue.
+        Row {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 4
+            spacing: 2
+            visible: cell.eventCount > 0
+
+            Repeater {
+                model: Math.min(cell.eventCount, 3)
+                delegate: Rectangle {
+                    width: 3; height: 3; radius: 1.5
+                    color: cell.isToday
+                        ? Appearance.colors.colOnPrimary
+                        : (cell.events[index]?.color || Appearance.colors.colPrimary)
+                    opacity: cell.currentMonth ? 1.0 : 0.3
+                }
+            }
+        }
+
+        // Igual que en el sidebar: un día con eventos se abre en el
+        // calendario web de un clic. Deshabilitado desbloqueado para no
+        // pisar el arrastre del widget.
+        MouseArea {
+            anchors.fill: parent
+            enabled: cell.eventCount > 0 && Config.options.background.widgetsLocked
+            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: Calendars.openDay(cell.dateKey)
         }
     }
 
@@ -155,6 +249,143 @@ AbstractBackgroundWidget {
                 if (root.sizeMode === "1x1") return oneByOneContent
                 if (root.sizeMode === "1x2") return oneByTwoContent
                 return twoByTwoContent
+            }
+        }
+
+        // Selector de mes/año. Se dibuja acá arriba (no adentro de
+        // twoByTwoContent) para que quede por encima de todo el contenido, y
+        // a propósito NO usa QtQuick.Controls.Popup: en esta ventana de fondo
+        // (capa "background" de wlr-layer-shell) los popups de Controls no
+        // son confiables — por eso los demás popups de la shell (ver
+        // StyledPopupMenu) tiran su propia PanelWindow en vez de un Popup.
+        // Acá alcanza con un Rectangle más, tapando la grilla mientras está
+        // abierto.
+        Rectangle {
+            id: monthYearFlyout
+            anchors.fill: parent
+            z: 10
+            radius: card.radius
+            color: Appearance.colors.colPrimaryContainer
+            visible: root.showMonthYearPicker && root.sizeMode === "2x2"
+
+            // Que un clic "atraviese" hacia la grilla de abajo mientras el
+            // selector está abierto sería peor que no tener selector.
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                anchors { fill: parent; margins: 16 }
+                spacing: 10
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Rectangle {
+                        implicitWidth: 26; implicitHeight: 26; radius: 13
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Appearance.colors.colPrimary
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "chevron_left"
+                            iconSize: Appearance.font.pixelSize.normal
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.pickerYear--
+                        }
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: Appearance.font.pixelSize.large
+                        font.weight: Font.Bold
+                        color: Appearance.colors.colOnPrimaryContainer
+                        text: root.pickerYear
+                    }
+
+                    Rectangle {
+                        implicitWidth: 26; implicitHeight: 26; radius: 13
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Appearance.colors.colPrimary
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "chevron_right"
+                            iconSize: Appearance.font.pixelSize.normal
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.pickerYear++
+                        }
+                    }
+
+                    Rectangle {
+                        implicitWidth: 26; implicitHeight: 26; radius: 13
+                        color: "transparent"
+                        MaterialSymbol {
+                            anchors.centerIn: parent
+                            text: "close"
+                            iconSize: Appearance.font.pixelSize.normal
+                            color: Appearance.colors.colOnPrimaryContainer
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showMonthYearPicker = false
+                        }
+                    }
+                }
+
+                Grid {
+                    id: monthGrid
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    columns: 3
+                    rowSpacing: 6
+                    columnSpacing: 6
+
+                    Repeater {
+                        model: root.monthNames
+                        delegate: Rectangle {
+                            id: monthCell
+                            required property string modelData
+                            required property int index
+                            readonly property bool selected: index === root.viewingDate.getMonth()
+                                && root.pickerYear === root.viewingDate.getFullYear()
+
+                            width: (monthGrid.width - monthGrid.columnSpacing * 2) / 3
+                            height: 30
+                            radius: Appearance.rounding.small
+                            color: monthCell.selected
+                                ? Appearance.colors.colPrimary
+                                : ColorUtils.transparentize(Appearance.colors.colLayer0, 0.8)
+
+                            StyledText {
+                                anchors.centerIn: parent
+                                text: monthCell.modelData
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: monthCell.selected
+                                    ? Appearance.colors.colOnPrimary
+                                    : Appearance.colors.colOnPrimaryContainer
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.goToMonth(root.pickerYear, monthCell.index)
+                                    root.showMonthYearPicker = false
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -267,19 +498,35 @@ AbstractBackgroundWidget {
                             implicitHeight: 28
 
                             Rectangle {
+                                id: weekDayCell
                                 anchors.centerIn: parent
                                 width: 28; height: 28
                                 radius: 14
                                 color: modelData.isToday ? Appearance.colors.colPrimary : "transparent"
 
+                                readonly property int eventCount: (Calendars.eventsByDate[modelData.dateKey] ?? []).length
+
                                 StyledText {
                                     anchors.centerIn: parent
+                                    anchors.verticalCenterOffset: weekDayCell.eventCount > 0 ? -2 : 0
                                     text: modelData.day
                                     font.pixelSize: Appearance.font.pixelSize.smaller
                                     font.weight: modelData.isToday ? Font.Bold : Font.Normal
                                     color: modelData.isToday
                                         ? Appearance.colors.colOnPrimary
                                         : Appearance.colors.colOnPrimaryContainer
+                                    opacity: modelData.currentMonth ? 1.0 : 0.3
+                                }
+
+                                Rectangle {
+                                    visible: weekDayCell.eventCount > 0
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 4
+                                    width: 3; height: 3; radius: 1.5
+                                    color: modelData.isToday
+                                        ? Appearance.colors.colOnPrimary
+                                        : Appearance.colors.colPrimary
                                     opacity: modelData.currentMonth ? 1.0 : 0.3
                                 }
                             }
@@ -302,12 +549,40 @@ AbstractBackgroundWidget {
                     Layout.fillWidth: true
                     spacing: 4
 
-                    StyledText {
+                    // El texto + flecha son un solo botón que abre el selector de
+                    // mes/año. Se deshabilita mientras los widgets están
+                    // desbloqueados: si no, arrastrar el widget desde acá termina
+                    // abriendo el selector en vez de moverlo.
+                    Item {
+                        id: monthYearButton
                         Layout.fillWidth: true
-                        font.pixelSize: Appearance.font.pixelSize.normal
-                        font.weight: Font.Medium
-                        color: Appearance.colors.colOnPrimaryContainer
-                        text: root.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                        implicitWidth: monthYearRow.implicitWidth
+                        implicitHeight: monthYearRow.implicitHeight
+                        opacity: monthYearArea.enabled ? 1 : 0.4
+
+                        RowLayout {
+                            id: monthYearRow
+                            spacing: 2
+                            StyledText {
+                                font.pixelSize: Appearance.font.pixelSize.normal
+                                font.weight: Font.Medium
+                                color: Appearance.colors.colOnPrimaryContainer
+                                text: root.viewingDate.toLocaleDateString(Qt.locale(), "MMMM yyyy")
+                            }
+                            MaterialSymbol {
+                                text: "arrow_drop_down"
+                                iconSize: Appearance.font.pixelSize.large
+                                color: Appearance.colors.colOnPrimaryContainer
+                            }
+                        }
+
+                        MouseArea {
+                            id: monthYearArea
+                            anchors.fill: parent
+                            enabled: Config.options.background.widgetsLocked
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.openMonthYearPicker()
+                        }
                     }
 
                     Rectangle {
@@ -315,6 +590,8 @@ AbstractBackgroundWidget {
                         color: "transparent"
                         border.width: 1
                         border.color: Appearance.colors.colPrimary
+                        enabled: Config.options.background.widgetsLocked
+                        opacity: enabled ? 1 : 0.4
                         MaterialSymbol {
                             anchors.centerIn: parent
                             text: "chevron_left"
@@ -333,6 +610,8 @@ AbstractBackgroundWidget {
                         color: "transparent"
                         border.width: 1
                         border.color: Appearance.colors.colPrimary
+                        enabled: Config.options.background.widgetsLocked
+                        opacity: enabled ? 1 : 0.4
                         MaterialSymbol {
                             anchors.centerIn: parent
                             text: "chevron_right"
@@ -386,6 +665,11 @@ AbstractBackgroundWidget {
                                         day: modelData.day
                                         currentMonth: modelData.currentMonth
                                         isToday: modelData.isToday
+                                        dateKey: modelData.dateKey
+                                        // eventsByDate cambia entero al refrescar, así que
+                                        // este binding se re-evalúa solo cuando llegan
+                                        // eventos nuevos.
+                                        events: Calendars.eventsByDate[modelData.dateKey] ?? []
                                     }
                                 }
                             }

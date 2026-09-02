@@ -19,7 +19,7 @@ Singleton {
     property string generateThumbnailsMagickScriptPath: `${FileUtils.trimFileProtocol(Directories.scriptPath)}/thumbnails/generate-thumbnails-magick.sh`
     property alias directory: folderModel.folder
     readonly property string effectiveDirectory: FileUtils.trimFileProtocol(folderModel.folder.toString())
-    property url defaultFolder: Qt.resolvedUrl(`${Directories.pictures}/Wallpapers`)
+    property url defaultFolder: Qt.resolvedUrl(`${Directories.pictures}/wallpapers`)
     property alias folderModel: folderModel // Expose for direct binding when needed
     property string searchQuery: ""
     /**
@@ -29,9 +29,39 @@ Singleton {
      * `Config.options.background.enableWallpaperPreview`.
      */
     property string previewPath: ""
-    readonly property list<string> extensions: [ // TODO: add videos
+    readonly property list<string> imageExtensions: [
         "jpg", "jpeg", "png", "webp", "avif", "bmp", "svg"
     ]
+    // Videos: los maneja mpvpaper (ver switchwall.sh), no QML Image.
+    readonly property list<string> videoExtensions: [
+        "mp4", "webm", "mkv", "avi", "mov"
+    ]
+    readonly property list<string> extensions: [...imageExtensions, ...videoExtensions]
+
+    function isVideoPath(path) {
+        if (!path || path.length === 0) return false;
+        const lower = path.toLowerCase();
+        return root.videoExtensions.some(ext => lower.endsWith(`.${ext}`));
+    }
+
+    // ---- Wallpaper por monitor ----
+    // `monitorName` vacío = "todos los monitores" (el global `wallpaperPath`/`thumbnailPath`).
+    function effectivePathForMonitor(monitorName) {
+        const map = Config.options.wallpaperPathByMonitor || {};
+        if (monitorName && map[monitorName]) return map[monitorName];
+        return Config.options.background.wallpaperPath;
+    }
+    function effectiveThumbnailForMonitor(monitorName) {
+        const map = Config.options.thumbnailPathByMonitor || {};
+        if (monitorName && map[monitorName]) return map[monitorName];
+        return Config.options.background.thumbnailPath;
+    }
+    // Lo que Background.qml debe efectivamente mostrar como <img>: si es video,
+    // su miniatura (mpvpaper pinta el video de verdad, aparte, en su propia capa).
+    function effectiveDisplayPathForMonitor(monitorName) {
+        const path = root.effectivePathForMonitor(monitorName);
+        return root.isVideoPath(path) ? root.effectiveThumbnailForMonitor(monitorName) : path;
+    }
     property list<string> wallpapers: [] // List of absolute file paths (without file://)
     readonly property bool thumbnailGenerationRunning: thumbgenProc.running
     property real thumbnailGenerationProgress: 0
@@ -51,9 +81,12 @@ Singleton {
         Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light"]);
     }
 
-    function apply(path, darkMode = Appearance.m3colors.darkmode) {
+    // `monitor` vacío = aplica a todos los monitores (y borra overrides por monitor previos).
+    function apply(path, darkMode = Appearance.m3colors.darkmode, monitor = "") {
         if (!path || path.length === 0) return;
-        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light", "--image", path]);
+        const args = [Directories.wallpaperSwitchScriptPath, "--mode", darkMode ? "dark" : "light", "--image", path];
+        if (monitor && monitor.length > 0) args.push("--monitor", monitor);
+        Quickshell.execDetached(args);
         root.changed()
     }
 
@@ -61,9 +94,11 @@ Singleton {
         id: selectProc
         property string filePath: ""
         property bool darkMode: Appearance.m3colors.darkmode
-        function select(filePath, darkMode = Appearance.m3colors.darkmode) {
+        property string monitor: ""
+        function select(filePath, darkMode = Appearance.m3colors.darkmode, monitor = "") {
             selectProc.filePath = filePath
             selectProc.darkMode = darkMode
+            selectProc.monitor = monitor
             selectProc.exec(["test", "-d", FileUtils.trimFileProtocol(filePath)])
         }
         onExited: (exitCode, exitStatus) => {
@@ -71,20 +106,34 @@ Singleton {
                 setDirectory(selectProc.filePath);
                 return;
             }
-            root.apply(selectProc.filePath, selectProc.darkMode);
+            root.apply(selectProc.filePath, selectProc.darkMode, selectProc.monitor);
         }
     }
 
-    function select(filePath, darkMode = Appearance.m3colors.darkmode) {
-        selectProc.select(filePath, darkMode);
+    function select(filePath, darkMode = Appearance.m3colors.darkmode, monitor = "") {
+        selectProc.select(filePath, darkMode, monitor);
     }
 
-    function randomFromCurrentFolder(darkMode = Appearance.m3colors.darkmode) {
+    // Saca el override de un monitor (vuelve a mostrar el wallpaper global ahí). No confundir
+    // con `apply(path, darkMode, "")`, que en cambio FIJA el global y borra TODOS los overrides.
+    Process {
+        id: clearMonitorProc
+        function clear(monitor) {
+            clearMonitorProc.exec([Directories.wallpaperSwitchScriptPath, "--clear-monitor", monitor]);
+        }
+        onExited: root.changed()
+    }
+    function clearMonitorOverride(monitor) {
+        if (!monitor || monitor.length === 0) return;
+        clearMonitorProc.clear(monitor);
+    }
+
+    function randomFromCurrentFolder(darkMode = Appearance.m3colors.darkmode, monitor = "") {
         if (folderModel.count === 0) return;
         const randomIndex = Math.floor(Math.random() * folderModel.count);
         const filePath = folderModel.get(randomIndex, "filePath");
         print("Randomly selected wallpaper:", filePath);
-        root.select(filePath, darkMode);
+        root.select(filePath, darkMode, monitor);
     }
 
     Process {
@@ -187,6 +236,18 @@ Singleton {
 
         function apply(path: string): void {
             root.apply(path);
+        }
+
+        function applyToMonitor(path: string, monitor: string): void {
+            root.apply(path, Appearance.m3colors.darkmode, monitor);
+        }
+
+        // Wallpaper efectivo que ESTE proceso de Quickshell tiene resuelto en memoria
+        // para ese monitor ahora mismo (override si tiene, si no el global). Útil para
+        // scripts, y para confirmar que un cambio externo a config.json ya se reflejó
+        // acá y no sólo en el archivo.
+        function currentForMonitor(monitor: string): string {
+            return root.effectivePathForMonitor(monitor);
         }
     }
 }

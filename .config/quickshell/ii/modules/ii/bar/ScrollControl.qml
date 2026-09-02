@@ -1,6 +1,7 @@
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
+import Quickshell
 
 /**
  * Base de los widgets de barra que se controlan con la rueda del mouse.
@@ -36,8 +37,17 @@ FocusedScrollMouseArea {
 
     readonly property bool vertical: Config.options.bar.vertical
 
-    implicitWidth: root.vertical ? Appearance.sizes.verticalBarWidth : content.implicitWidth + 10
-    implicitHeight: root.vertical ? content.implicitHeight + 6 : Appearance.sizes.barHeight
+    // El eje de scroll queda bien más ancho que el ícono: con solo icono+10px
+    // (~26-30px), cualquier microtemblor de la mano al girar la rueda saca el
+    // cursor del widget, y ahí Qt deja de mandarle más wheel events a este
+    // MouseArea — el volumen/brillo dejaba de cambiar aunque se siguiera
+    // scrolleando. No hay forma confiable de "seguir recibiendo" eventos de
+    // rueda fuera de los bounds del item, así que el área tiene que ser
+    // generosa desde el vamos.
+    readonly property real scrollAxisPadding: 30
+
+    implicitWidth: root.vertical ? Appearance.sizes.verticalBarWidth : content.implicitWidth + root.scrollAxisPadding
+    implicitHeight: root.vertical ? content.implicitHeight + root.scrollAxisPadding : Appearance.sizes.barHeight
 
     onScrollUp: root.increase()
     onScrollDown: root.decrease()
@@ -57,19 +67,29 @@ FocusedScrollMouseArea {
         }
     }
 
-    // Mismo apilado que ScrollHint: el spacing negativo es a propósito, las cajas
-    // de los glifos traen aire de sobra y sin eso no entra en los 40px de la barra.
-    Column {
+    // Las flechitas van superpuestas sobre el ícono central en vez de apiladas en
+    // un Column: el alto real de un glifo de texto (ascent/descent de la fuente)
+    // no es predecible, así que apilar 3 con spacing negativo "ajustado a ojo"
+    // quedaba recortado por el clip del contenedor apenas cambiaba la métrica de
+    // fuente/escala. Acá `content` solo mide el ícono central, y las flechas se
+    // anclan relativas a su centro, así que nunca empujan el alto real por fuera
+    // de los 40px de la barra.
+    Item {
         id: content
         anchors.centerIn: parent
-        spacing: -7
+        implicitWidth: mainIcon.implicitWidth
+        implicitHeight: mainIcon.implicitHeight
 
         Chevron {
             text: "keyboard_arrow_up"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: mainIcon.verticalCenter
+            anchors.bottomMargin: 7
         }
 
         MaterialSymbol {
-            anchors.horizontalCenter: parent.horizontalCenter
+            id: mainIcon
+            anchors.centerIn: parent
             text: root.icon
             iconSize: 16
             color: root.accentColor
@@ -77,6 +97,9 @@ FocusedScrollMouseArea {
 
         Chevron {
             text: "keyboard_arrow_down"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: mainIcon.verticalCenter
+            anchors.topMargin: 7
         }
     }
 
@@ -94,5 +117,13 @@ FocusedScrollMouseArea {
     PopupToolTip {
         text: root.tooltipText
         extraVisibleCondition: root.tooltipText.length > 0 && root.hoverTimedOut
+        // Sin esto el tooltip usa el default (Edges.Top) y, con la barra
+        // arriba de la pantalla, el popup intenta abrirse hacia arriba y
+        // termina reposicionado encima del cursor: tapa el mouse, el hover
+        // se pierde, el tooltip se cierra, el cursor vuelve a quedar sobre
+        // el widget, hover vuelve a activarse... y así en loop (parpadeo),
+        // comiéndose además los wheel events que llegan durante el loop.
+        // Mismo fix que ya tiene SysTrayItem.qml.
+        anchorEdges: (!Config.options.bar.bottom && !Config.options.bar.vertical) ? Edges.Bottom : Edges.Top
     }
 }

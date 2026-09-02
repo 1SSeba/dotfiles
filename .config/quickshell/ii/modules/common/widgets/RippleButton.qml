@@ -57,11 +57,22 @@ Button {
         easing.bezierCurve: Appearance?.animationCurves.standardDecel
     }
 
+    // TEMPORAL — debug del bug de historyButton/addButton/settingsButton en
+    // AiTabBar.qml que no responde ni al hover. Sacar apenas se identifique
+    // la causa. Loguea CUALQUIER RippleButton de la app (son todos el mismo
+    // componente), así que sirve para comparar uno que sabemos que funciona
+    // contra los que no.
+    onHoveredChanged: console.log("[DEBUG RippleButton] hovered =", root.hovered, "text =", root.buttonText, "pos =", root.x, root.y, "size =", root.width, root.height)
+
     MouseArea {
         anchors.fill: parent
         cursorShape: root.pointingHandCursor ? Qt.PointingHandCursor : Qt.ArrowCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        onPressed: (event) => { 
+        hoverEnabled: true
+        onEntered: console.log("[DEBUG RippleButton] MouseArea entered, text =", root.buttonText)
+        onExited: console.log("[DEBUG RippleButton] MouseArea exited, text =", root.buttonText)
+        onPressed: (event) => {
+            console.log("[DEBUG RippleButton] MouseArea pressed, text =", root.buttonText)
             if(event.button === Qt.RightButton) {
                 if (root.altAction) root.altAction(event);
                 return;

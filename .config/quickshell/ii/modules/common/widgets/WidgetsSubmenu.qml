@@ -6,10 +6,57 @@ import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 
 Item {
     id: root
     implicitHeight: col.implicitHeight + 16
+
+    // Este menú se abre parado sobre un monitor puntual (el que se clickeó con
+    // el botón derecho); los switches tienen que reflejar y controlar "¿se ve
+    // ACÁ?", no el `enable` global — si no, un widget restringido a otra
+    // pantalla (Config.options.background.widgets.<x>.screenList) aparece
+    // marcado como activo en un monitor donde en realidad no se dibuja.
+    readonly property string screenName: GlobalStates.desktopMenuScreen?.name ?? ""
+
+    function isVisibleHere(key) {
+        const w = Config.options.background.widgets[key];
+        if (!w.enable) return false;
+        return w.screenList.length === 0 || w.screenList.includes(root.screenName);
+    }
+
+    function setVisibleHere(key, on) {
+        const w = Config.options.background.widgets[key];
+        const allNames = Quickshell.screens.map(s => s.name);
+        if (on) {
+            const wasOff = !w.enable;
+            w.enable = true;
+            // Se estaba prendiendo desde apagado del todo: por defecto queda
+            // exclusivo de esta pantalla (screenList vacío significaría
+            // "todas"), salvo que Settings pida compartir los widgets nuevos
+            // entre monitores.
+            if (wasOff && w.screenList.length === 0 && !Config.options.background.shareWidgetsAcrossScreens) {
+                w.screenList = [root.screenName];
+                return;
+            }
+            // Lista vacía ya significa "todas": esta pantalla ya está incluida.
+            if (w.screenList.length > 0 && !w.screenList.includes(root.screenName)) {
+                const list = w.screenList.concat([root.screenName]);
+                // Si quedaron todas, se vuelve a la forma canónica: vacía.
+                w.screenList = (list.length === allNames.length) ? [] : list;
+            }
+            return;
+        }
+        // Apagar "acá": si vivía en todas, pasa a vivir en todas menos esta;
+        // si ya era exclusivo de esta pantalla, se apaga del todo.
+        const base = w.screenList.length === 0 ? allNames : w.screenList;
+        const rest = base.filter(n => n !== root.screenName);
+        if (rest.length === 0) {
+            w.enable = false;
+        } else {
+            w.screenList = rest;
+        }
+    }
 
     readonly property var widgetList: [
         { key: "visualizer",  icon: "graphic_eq",         name: Translation.tr("Visualizer") },
@@ -44,6 +91,15 @@ Item {
             onCheckedChanged: Config.options.background.widgetsLocked = checked
         }
 
+        StyledText {
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            visible: root.screenName.length > 0 && Quickshell.screens.length > 1
+            text: Translation.tr("On %1").arg(root.screenName)
+            font.pixelSize: Appearance.font.pixelSize.smaller
+            color: Appearance.colors.colSubtext
+        }
+
         Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 4
@@ -60,8 +116,8 @@ Item {
                 Layout.fillWidth: true
                 buttonIcon: modelData.icon
                 text: modelData.name
-                checked: Config.options.background.widgets[modelData.key].enable
-                onCheckedChanged: Config.options.background.widgets[modelData.key].enable = checked
+                checked: root.isVisibleHere(modelData.key)
+                onCheckedChanged: root.setVisibleHere(modelData.key, checked)
             }
         }
     }

@@ -32,8 +32,17 @@ Item {
     property var suggestionQuery: ""
     property var suggestionList: []
 
-    /** Qué panel de opciones está desplegado: "" | "model" | "effort" | "tool". */
+    /** Qué panel de opciones está desplegado: "" | "model" | "effort" | "tool" | "addModel". */
     property string openPicker: ""
+    /** Modal para elegir agente al crear una pestaña nueva (ver AiNewChatDialog). */
+    property bool showNewChatDialog: false
+    readonly property var agents: Config.options?.ai?.agents ?? []
+
+    /** Ctrl+T y el botón "+" comparten esta lógica: sin nada que elegir, crear directo. */
+    function requestNewChat() {
+        if (root.agents.length <= 1) Ai.newSession();
+        else root.showNewChatDialog = true;
+    }
     readonly property var toolIcons: ({
         "functions": "construction",
         "search": "travel_explore",
@@ -69,7 +78,8 @@ Item {
         }
         // Pestañas: nueva, cerrar, e ir a la N
         if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_T) {
-            Ai.newSession();
+            // Mismo camino que el botón "+": si hay más de un agente, pregunta.
+            root.requestNewChat();
             event.accepted = true;
         } else if (event.modifiers === Qt.ControlModifier && event.key === Qt.Key_H) {
             // El historial también por teclado: el botón de la barra tiene un
@@ -408,6 +418,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             visible: Config.options.sidebar.ai.showTabBar
             historyOpen: root.historyOpen
             onHistoryToggled: root.toggleHistory()
+            onNewChatDialogRequested: root.requestNewChat()
         }
 
         Rectangle {
@@ -504,7 +515,6 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
                 onUserScrolled: messageListView.stickToEnd = false
 
-
                 onContentHeightChanged: if (messageListView.stickToEnd) snapDebounce.restart()
                 onHeightChanged: if (messageListView.stickToEnd) snapDebounce.restart()
                 onCountChanged: if (messageListView.stickToEnd) snapDebounce.restart()
@@ -513,18 +523,29 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     id: snapDebounce
                     interval: 400
                     repeat: false
+                    // Cuántas veces más reintentar mientras height/count sigan
+                    // inválidos. Medido en vivo (logs con timestamps, sidebar
+                    // real): al reabrir, la lectura de `height` en el mismo
+                    // tick en que cambia `GlobalStates.sidebarLeftOpen` puede
+                    // ser 0 —el layout todavía no corrió su pase— y a veces
+                    // `count` pasa brevemente por 0 mientras el modelo se
+                    // repuebla. Casi siempre algo (`onHeightChanged`,
+                    // `onCountChanged`) reprograma este timer solo, pero
+                    // depender de eso a ciegas es lo que dejaba la vista
+                    // pegada arriba del todo cuando esa señal de rebote no
+                    // llegaba a tiempo. Un puñado de reintentos cortos lo
+                    // cubre sin volver al polling eterno de antes.
+                    property int retriesLeft: 0
                     onTriggered: {
                         if (!messageListView.stickToEnd) return;
-                        // Con height 0 el "final" no significa nada, y hay que
-                        // REINTENTAR en vez de rendirse: al reabrir el sidebar el
-                        // contenido ya está medido de antes, así que no viene
-                        // ningún cambio de altura atrás que vuelva a disparar esto.
                         if (messageListView.height <= 0 || messageListView.count === 0) {
-                            // Sin reintentar acá: cuando el sidebar se abre,
-                            // height pasa de 0 al valor real y onHeightChanged
-                            // vuelve a disparar este timer. Reintentar a ciegas
-                            // dejaba un tick cada 400 ms para siempre con el
-                            // sidebar cerrado.
+                            if (snapDebounce.retriesLeft > 0) {
+                                snapDebounce.retriesLeft -= 1;
+                                snapDebounce.restart();
+                            }
+                            // Sin más reintentos: cubrimos el arranque en
+                            // falso de arriba, no un sidebar genuinamente
+                            // cerrado o un chat genuinamente vacío.
                             return;
                         }
 
@@ -550,6 +571,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
                 function goToEnd() {
                     messageListView.stickToEnd = true;
+                    snapDebounce.retriesLeft = 8; // ~3.2s de margen para que el sidebar termine de asentarse
                     snapDebounce.restart();
                 }
 
@@ -675,6 +697,14 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 Ai.setModel(key, false);
                 root.openPicker = "";
             }
+
+            // Chip al final de la lista para cargar un modelo custom sin tocar
+            // el config a mano (ver AiAddModelForm, ahora un modal — el Loader
+            // que lo hostea vive al final del archivo, junto al de
+            // AiNewChatDialog).
+            showAddOption: true
+            addLabel: Translation.tr("Agregar modelo")
+            onAddRequested: root.openPicker = "addModel"
         }
 
         AiOptionPicker { // Esfuerzo de Claude Code
@@ -1119,6 +1149,38 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     }
                 }
             }
+        }
+    }
+
+    // Modal para elegir agente al crear pestaña (ver AiNewChatDialog). Va acá
+    // afuera del ColumnLayout, con z alto, para taparlo TODO — antes esto era
+    // una fila de chips que se desplegaba adentro de la barra de pestañas y
+    // costaba notar que había algo para elegir.
+    Loader {
+        anchors.fill: parent
+        active: root.showNewChatDialog
+        visible: root.showNewChatDialog
+        z: 9999
+        sourceComponent: AiNewChatDialog {
+            agents: root.agents
+            onCanceled: root.showNewChatDialog = false
+            onAgentPicked: agentId => {
+                Ai.newSession(agentId);
+                root.showNewChatDialog = false;
+            }
+        }
+    }
+
+    // Modal para cargar un modelo custom (ver AiAddModelForm). Antes era un
+    // panel que se desplegaba inline abajo del selector de modelos; ahora es
+    // un modal de verdad, mismo patrón que el de arriba.
+    Loader {
+        anchors.fill: parent
+        active: root.openPicker === "addModel"
+        visible: root.openPicker === "addModel"
+        z: 9999
+        sourceComponent: AiAddModelForm {
+            onClosed: root.openPicker = ""
         }
     }
 }

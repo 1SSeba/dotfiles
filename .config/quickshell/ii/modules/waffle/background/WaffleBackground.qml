@@ -39,7 +39,7 @@ Variants {
 
         StyledImage {
             anchors.fill: parent
-            source: Config.options.background.wallpaperPath
+            source: Wallpapers.effectiveDisplayPathForMonitor(panelRoot.screen?.name ?? "")
             fillMode: Image.PreserveAspectCrop
         }
     }

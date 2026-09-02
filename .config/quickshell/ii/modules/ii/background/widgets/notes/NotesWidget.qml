@@ -20,7 +20,13 @@ AbstractBackgroundWidget {
     property string mode: "list" // "list" | "edit"
     property var pendingNoteId: null
     property string editingText: ""
-    onModeChanged: GlobalStates.desktopWidgetKeyboardFocus = (mode === "edit")
+    // Las notas más nuevas (o recién tocadas) arriba, no al fondo de la lista.
+    readonly property var sortedNotes: [...Notes.list].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+
+    onModeChanged: {
+        GlobalStates.desktopWidgetKeyboardFocus = (mode === "edit")
+        if (mode === "edit") editTextArea.forceActiveFocus()
+    }
 
     function toggleFlip() { flipAnim.start() }
 
@@ -37,12 +43,16 @@ AbstractBackgroundWidget {
     }
 
     function saveAndBack() {
-        if (root.editingText.length > 0) {
+        const text = root.editingText.trim()
+        if (text.length > 0) {
             if (root.pendingNoteId) {
                 Notes.updateNote(root.pendingNoteId, root.editingText)
             } else {
                 Notes.addNote(root.editingText)
             }
+        } else if (root.pendingNoteId) {
+            // Vaciaste una nota que ya existía: borrarla, no dejarla como estaba.
+            Notes.deleteNote(root.pendingNoteId)
         }
         toggleFlip()
     }
@@ -105,79 +115,111 @@ AbstractBackgroundWidget {
                     ToolbarPairedFab {
                         Layout.rightMargin: 4
                         Layout.alignment: Qt.AlignVCenter
+                        enabled: Config.options.background.widgetsLocked
+                        opacity: enabled ? 1 : 0.4
                         baseSize: 38
                         iconText: "add"
                         onClicked: root.openNewNote()
                     }
                 }
 
-                StyledListView {
-                    id: notesListView
+                Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    clip: true
-                    spacing: 6
-                    model: Notes.list
 
-                    delegate: SwipeDelegate {
-                        id: noteCard
-                        required property var modelData
-                        required property int index
-
-                        width: notesListView.width
-                        implicitHeight: 55
-                        padding: 0
-                        background: null
+                    StyledListView {
+                        id: notesListView
+                        anchors.fill: parent
+                        // Desbloqueado, la lista no debe comerse el gesto de
+                        // arrastre del widget (ni scrolleando ni abriendo una nota).
+                        interactive: Config.options.background.widgetsLocked
                         clip: true
+                        spacing: 6
+                        model: root.sortedNotes
 
-                        property color bg: {
-                            const cyclePos = index % 3
-                            if (cyclePos === 0) return Appearance.colors.colPrimary
-                            if (cyclePos === 1) return Appearance.colors.colSecondary
-                            return Appearance.colors.colTertiary
-                        }
-                        property color fg: {
-                            const cyclePos = index % 3
-                            if (cyclePos === 0) return Appearance.colors.colOnPrimary
-                            if (cyclePos === 1) return Appearance.colors.colOnSecondary
-                            return Appearance.colors.colOnTertiary
-                        }
+                        delegate: SwipeDelegate {
+                            id: noteCard
+                            required property var modelData
+                            required property int index
 
-                        onClicked: root.openNote(noteCard.modelData)
+                            enabled: Config.options.background.widgetsLocked
+                            opacity: enabled ? 1 : 0.5
+                            width: notesListView.width
+                            implicitHeight: 55
+                            padding: 0
+                            background: null
+                            clip: true
 
-                        contentItem: Rectangle {
-                            radius: Appearance.rounding.normal
-                            color: noteCard.bg
-                            width: parent.width - Math.abs(noteCard.swipe.position) * 6
+                            property color bg: {
+                                const cyclePos = index % 3
+                                if (cyclePos === 0) return Appearance.colors.colPrimary
+                                if (cyclePos === 1) return Appearance.colors.colSecondary
+                                return Appearance.colors.colTertiary
+                            }
+                            property color fg: {
+                                const cyclePos = index % 3
+                                if (cyclePos === 0) return Appearance.colors.colOnPrimary
+                                if (cyclePos === 1) return Appearance.colors.colOnSecondary
+                                return Appearance.colors.colOnTertiary
+                            }
 
-                            StyledText {
-                                anchors {
-                                    left: parent.left; right: parent.right
-                                    verticalCenter: parent.verticalCenter
-                                    leftMargin: 12; rightMargin: 12
+                            onClicked: root.openNote(noteCard.modelData)
+
+                            contentItem: Rectangle {
+                                radius: Appearance.rounding.normal
+                                color: noteCard.bg
+                                width: parent.width - Math.abs(noteCard.swipe.position) * 6
+
+                                StyledText {
+                                    anchors {
+                                        left: parent.left; right: parent.right
+                                        verticalCenter: parent.verticalCenter
+                                        leftMargin: 12; rightMargin: 12
+                                    }
+                                    color: noteCard.fg
+                                    text: noteCard.modelData.content
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
                                 }
-                                color: noteCard.fg
-                                text: noteCard.modelData.content
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
+                            }
+
+                            swipe.right: Rectangle {
+                                width: 64
+                                anchors.right: parent.right
+                                height: parent.height
+                                radius: Appearance.rounding.normal
+                                color: Appearance.colors.colError
+
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "delete"
+                                    iconSize: Appearance.font.pixelSize.larger
+                                    color: Appearance.colors.colOnError
+                                }
+
+                                SwipeDelegate.onClicked: Notes.deleteNote(noteCard.modelData.id)
                             }
                         }
+                    }
 
-                        swipe.right: Rectangle {
-                            width: 64
-                            anchors.right: parent.right
-                            height: parent.height
-                            radius: Appearance.rounding.normal
-                            color: Appearance.colors.colError
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        visible: notesListView.count === 0
+                        spacing: 6
 
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: "delete"
-                                iconSize: Appearance.font.pixelSize.larger
-                                color: Appearance.colors.colOnError
-                            }
-
-                            SwipeDelegate.onClicked: Notes.deleteNote(noteCard.modelData.id)
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "sticky_note_2"
+                            iconSize: 32
+                            color: Appearance.colors.colOnPrimaryContainer
+                            opacity: 0.4
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Sin notas"
+                            color: Appearance.colors.colOnPrimaryContainer
+                            opacity: 0.5
+                            font.pixelSize: Appearance.font.pixelSize.small
                         }
                     }
                 }
@@ -198,6 +240,8 @@ AbstractBackgroundWidget {
                         radius: Appearance.rounding.full
                         color: "transparent"
                         implicitWidth: 28; implicitHeight: 28
+                        enabled: Config.options.background.widgetsLocked
+                        opacity: enabled ? 1 : 0.4
                         MaterialSymbol {
                             anchors.centerIn: parent
                             iconSize: Appearance.font.pixelSize.normal
@@ -215,6 +259,8 @@ AbstractBackgroundWidget {
                     ToolbarPairedFab {
                         Layout.rightMargin: 4
                         Layout.alignment: Qt.AlignVCenter
+                        enabled: Config.options.background.widgetsLocked
+                        opacity: enabled ? 1 : 0.4
                         baseSize: 38
                         iconText: "save"
                         onClicked: root.saveAndBack()
@@ -226,6 +272,8 @@ AbstractBackgroundWidget {
                     Layout.fillHeight: true
                     radius: Appearance.rounding.normal
                     color: Appearance.colors.colSurfaceContainerLow
+                    enabled: Config.options.background.widgetsLocked
+                    opacity: enabled ? 1 : 0.5
 
                     TextArea {
                         id: editTextArea

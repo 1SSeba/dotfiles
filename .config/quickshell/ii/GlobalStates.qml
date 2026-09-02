@@ -39,6 +39,8 @@ Singleton {
     property bool superDown: false
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
+    // Monitor al que se aplica lo que se elija en el selector. "" = todos los monitores.
+    property string wallpaperSelectorTargetMonitor: ""
     /**
      * Sólo tiene sentido dentro del proceso de la app de settings (`qs -p settings.qml`),
      * que la observa para cerrarse. En el proceso de la shell no la mira nadie: para

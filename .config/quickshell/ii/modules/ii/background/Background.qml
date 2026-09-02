@@ -93,6 +93,17 @@ Variants {
         readonly property bool widgetsOnThisScreen: Config.options.background.screenList.length === 0
             || Config.options.background.screenList.includes(bgRoot.screen?.name ?? "")
 
+        // Cada widget del fondo puede además restringirse a sus propios monitores
+        // (Config.options.background.widgets.<nombre>.screenList), independiente de
+        // los demás: uno puede vivir en DP-1 y otro en HDMI-A-1. Lista vacía = ese
+        // widget sigue el criterio general de arriba (`widgetsOnThisScreen`).
+        function widgetOnThisScreen(widgetConfig) {
+            if (!bgRoot.widgetsOnThisScreen)
+                return false;
+            const list = widgetConfig.screenList;
+            return list.length === 0 || list.includes(bgRoot.screen?.name ?? "");
+        }
+
         // Hide when fullscreen
         property list<HyprlandWorkspace> workspacesForMonitor: Hyprland.workspaces.values.filter(workspace => workspace.monitor && workspace.monitor.name == monitor.name)
         property var activeWorkspaceWithFullscreen: workspacesForMonitor.filter(workspace => ((workspace.toplevels.values.filter(window => window.wayland?.fullscreen)[0] != undefined) && workspace.active))[0]
@@ -106,13 +117,16 @@ Variants {
         property int workspaceChunkSize: Config?.options.bar.workspaces.shown ?? 10
         property int totalWorkspaces: Math.ceil(lastWorkspaceId / workspaceChunkSize) * workspaceChunkSize
         // Wallpaper
-        property bool wallpaperIsVideo: Config.options.background.wallpaperPath.endsWith(".mp4") || Config.options.background.wallpaperPath.endsWith(".webm") || Config.options.background.wallpaperPath.endsWith(".mkv") || Config.options.background.wallpaperPath.endsWith(".avi") || Config.options.background.wallpaperPath.endsWith(".mov")
+        // Cada monitor puede tener su propio wallpaper (Config.options.background.wallpaperPathByMonitor);
+        // si no tiene entrada, cae al `wallpaperPath` global ("todos los monitores").
+        readonly property string monitorName: bgRoot.screen?.name ?? ""
+        property bool wallpaperIsVideo: Wallpapers.isVideoPath(Wallpapers.effectivePathForMonitor(bgRoot.monitorName))
         // Con la previsualización activada, pasar el mouse por una miniatura del
         // selector cambia lo que se ve acá sin tocar el wallpaper de verdad.
         // `background.enableWallpaperPreview` tenía control en Settings y ningún lector.
         property string wallpaperPath: (Config.options.background.enableWallpaperPreview && Wallpapers.previewPath.length > 0)
             ? Wallpapers.previewPath
-            : (wallpaperIsVideo ? Config.options.background.thumbnailPath : Config.options.background.wallpaperPath)
+            : Wallpapers.effectiveDisplayPathForMonitor(bgRoot.monitorName)
 
         // ---- Wallpaper centrado ----
         // En vez de cubrir la pantalla, recorta el wallpaper dentro de una figura en el medio.
@@ -569,7 +583,7 @@ Variants {
                         ? CF.FileUtils.trimFileProtocol(decodeURIComponent(drop.urls[0].toString()))
                         : "";
                     if (single !== "" && wallpaperDropArea.imageExtensions.test(single)) {
-                        Wallpapers.select(single, Appearance.m3colors.darkmode);
+                        Wallpapers.select(single, Appearance.m3colors.darkmode, bgRoot.monitorName);
                     } else {
                         const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y);
                         DropShelf.show(drop.urls, globalPos.x, globalPos.y);
@@ -640,7 +654,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.weather.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.weather.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.weather)
                     sourceComponent: WeatherWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -651,7 +665,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.calendar.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.calendar.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.calendar)
                     sourceComponent: CalendarWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -662,7 +676,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.resources.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.resources.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.resources)
                     sourceComponent: ResourcesWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -673,7 +687,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.userCard.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.userCard.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.userCard)
                     sourceComponent: UserCardWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -684,7 +698,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.media.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.media.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.media)
                     sourceComponent: MediaWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -695,7 +709,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.visualizer.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.visualizer.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.visualizer)
                     sourceComponent: VisualizerWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -706,7 +720,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.customImage.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.customImage.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.customImage)
                     sourceComponent: CustomImage {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -717,7 +731,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.images.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.images.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.images)
                     sourceComponent: ImageConverterWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -728,7 +742,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.notes.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.notes.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.notes)
                     sourceComponent: NotesWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -739,7 +753,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.worldClock.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.worldClock.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.worldClock)
                     sourceComponent: WorldClockWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height
@@ -750,7 +764,7 @@ Variants {
                 }
 
                 FadeLoader {
-                    shown: Config.options.background.widgets.clock.enable && bgRoot.widgetsOnThisScreen
+                    shown: Config.options.background.widgets.clock.enable && bgRoot.widgetOnThisScreen(Config.options.background.widgets.clock)
                     sourceComponent: ClockWidget {
                         screenWidth: bgRoot.screen.width
                         screenHeight: bgRoot.screen.height

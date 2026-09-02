@@ -1,6 +1,7 @@
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
+import Quickshell
 
 Revealer { // Scroll hint
     id: root
@@ -32,6 +33,11 @@ Revealer { // Scroll hint
         PopupToolTip {
             extraVisibleCondition: (tooltipText.length > 0 && mouseArea.showHintTimedOut)
             text: tooltipText
+            // Mismo fix que SysTrayItem.qml/ScrollControl.qml: con la barra
+            // arriba el default (Edges.Top) hace que el popup se reposicione
+            // encima del cursor y parpadee (tapa el hover, se cierra, se
+            // vuelve a mostrar...).
+            anchorEdges: (!Config.options.bar.bottom && !Config.options.bar.vertical) ? Edges.Bottom : Edges.Top
         }
 
         Column {

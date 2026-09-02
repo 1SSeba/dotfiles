@@ -2,6 +2,7 @@ pragma Singleton
 import qs.modules.common
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 
 /**
@@ -51,5 +52,17 @@ Singleton {
                 item: null
             }
         }
+    }
+
+    // El IdleInhibitor de arriba (protocolo wayland idle-inhibit sobre una
+    // superficie layer-shell) no es respetado de forma confiable por
+    // Hyprland/hypridle: en la práctica el PC se suspendió con "Keep awake"
+    // activado. Como respaldo, tomamos también un inhibidor de logind que
+    // bloquea el suspend directamente a nivel systemd, sin depender del
+    // protocolo wayland ni de si Hyprland reconoce esta superficie.
+    Process {
+        id: sleepInhibitProc
+        running: root.inhibit
+        command: ["systemd-inhibit", "--what=sleep", "--mode=block", "--who=quickshell", "--why=Manual keep-awake toggle", "sleep", "infinity"]
     }
 }

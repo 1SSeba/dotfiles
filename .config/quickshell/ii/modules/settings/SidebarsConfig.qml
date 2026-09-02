@@ -5,17 +5,33 @@ import qs.modules.common
 import qs.modules.common.widgets
 
 /**
- * Ajustes del sidebar izquierdo.
- *
- * Cada ContentSection de acá se corresponde con una pestaña de
- * modules/ii/sidebarLeft/SidebarLeftContent.qml, en el mismo orden en que
- * aparecen las pestañas: Intelligence, Translator, Inspo, Music, Social, Anime.
- * Lo del sidebar derecho (banner, quick toggles, sliders, corner open) sigue
- * viviendo en InterfaceConfig.qml.
+ * Ajustes de los sidebars (izquierdo y derecho): comportamiento (quick
+ * toggles, sliders, esquinas calientes) y el contenido de cada pestaña del
+ * sidebar izquierdo (Intelligence, Traductor, Inspo, Música, Social, Anime).
  */
+
 ContentPage {
     id: page
     forceWidth: true
+
+    /**
+     * Acciones que puede disparar una esquina caliente. Vive acá y no en GlobalStates
+     * porque este fork todavía no la tiene centralizada; los valores son los nombres de
+     * las propiedades de GlobalStates, así quien las consuma solo hace toggle por nombre.
+     */
+    readonly property var hotCornerActions: [
+        { displayName: Translation.tr("Nada"), value: "none" },
+        { displayName: Translation.tr("Sidebar izquierdo"), value: "sidebarLeftOpen" },
+        { displayName: Translation.tr("Sidebar derecho"), value: "sidebarRightOpen" },
+        { displayName: Translation.tr("Overview"), value: "overviewOpen" },
+        { displayName: Translation.tr("Selector de wallpaper"), value: "wallpaperSelectorOpen" },
+        { displayName: Translation.tr("Controles de música"), value: "mediaControlsOpen" },
+        { displayName: Translation.tr("Overlay"), value: "overlayOpen" },
+        { displayName: Translation.tr("Captura de región"), value: "regionSelectorOpen" },
+        { displayName: Translation.tr("Traductor de pantalla"), value: "screenTranslatorOpen" },
+        { displayName: Translation.tr("Teclado en pantalla"), value: "oskOpen" },
+        { displayName: Translation.tr("Menú de sesión"), value: "sessionOpen" },
+    ]
 
     // Los providers y las fuentes los publican los propios servicios, así que
     // los combos se arman solos y no se desincronizan si cambia la lista.
@@ -27,6 +43,294 @@ ContentPage {
         displayName: InspoService.sources[source]?.name ?? source,
         value: source
     }))
+
+    ContentSection {
+        icon: "side_navigation"
+        title: Translation.tr("Sidebars")
+        // Comportamiento del sidebar derecho. El contenido del sidebar izquierdo
+        // (pestañas, AI, traductor, inspo, música, social, anime) está más abajo
+        // en esta misma página.
+
+        // Franja con imagen arriba del sidebar derecho
+        ConfigSwitch {
+            buttonIcon: "planner_banner_ad_pt"
+            text: Translation.tr("Banner")
+            checked: Config.options.sidebar.banner
+            onCheckedChanged: {
+                Config.options.sidebar.banner = checked;
+            }
+        }
+
+        // Vacío = la imagen que viene por defecto
+        ConfigTextArea {
+            id: bannerImageField
+            Layout.fillWidth: true
+            enabled: Config.options.sidebar.banner
+            buttonIcon: "imagesmode"
+            text: Translation.tr("Imagen del banner")
+            placeholderText: Translation.tr("Ruta (vacío = la de siempre)")
+            fieldWidth: 300
+            value: Config.options.sidebar.bannerImage ?? ""
+            onValueChanged: {
+                bannerImageDebounce.restart();
+            }
+            // Escribir en cada tecla haría que Config guarde el archivo decenas de veces
+            Timer {
+                id: bannerImageDebounce
+                interval: 1000
+                onTriggered: {
+                    Config.options.sidebar.bannerImage = bannerImageField.value;
+                }
+            }
+        }
+
+        ConfigSwitch {
+            buttonIcon: "music_note"
+            text: Translation.tr("Reproductor en el sidebar derecho")
+            checked: Config.options.sidebar.mediaPlayer
+            onCheckedChanged: {
+                Config.options.sidebar.mediaPlayer = checked;
+            }
+        }
+
+        ConfigSwitch {
+            buttonIcon: "memory"
+            text: Translation.tr('Keep right sidebar loaded')
+            checked: Config.options.sidebar.keepRightSidebarLoaded
+            onCheckedChanged: {
+                Config.options.sidebar.keepRightSidebarLoaded = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("When enabled keeps the content of the right sidebar loaded to reduce the delay when opening,\nat the cost of around 15MB of consistent RAM usage. Delay significance depends on your system's performance.\nUsing a custom kernel like linux-cachyos might help")
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Quick toggles")
+            
+            ConfigSelectionArray {
+                Layout.fillWidth: false
+                currentValue: Config.options.sidebar.quickToggles.style
+                onSelected: newValue => {
+                    Config.options.sidebar.quickToggles.style = newValue;
+                }
+                options: [
+                    {
+                        displayName: Translation.tr("Classic"),
+                        icon: "password_2",
+                        value: "classic"
+                    },
+                    {
+                        displayName: Translation.tr("Android"),
+                        icon: "action_key",
+                        value: "android"
+                    }
+                ]
+            }
+
+            ConfigSpinBox {
+                enabled: Config.options.sidebar.quickToggles.style === "android"
+                icon: "splitscreen_left"
+                text: Translation.tr("Columns")
+                value: Config.options.sidebar.quickToggles.android.columns
+                from: 1
+                to: 8
+                stepSize: 1
+                onValueChanged: {
+                    Config.options.sidebar.quickToggles.android.columns = value;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Sliders")
+
+            ConfigSwitch {
+                buttonIcon: "check"
+                text: Translation.tr("Enable")
+                checked: Config.options.sidebar.quickSliders.enable
+                onCheckedChanged: {
+                    Config.options.sidebar.quickSliders.enable = checked;
+                }
+            }
+            
+            ConfigSwitch {
+                buttonIcon: "brightness_6"
+                text: Translation.tr("Brightness")
+                enabled: Config.options.sidebar.quickSliders.enable
+                checked: Config.options.sidebar.quickSliders.showBrightness
+                onCheckedChanged: {
+                    Config.options.sidebar.quickSliders.showBrightness = checked;
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "volume_up"
+                text: Translation.tr("Volume")
+                enabled: Config.options.sidebar.quickSliders.enable
+                checked: Config.options.sidebar.quickSliders.showVolume
+                onCheckedChanged: {
+                    Config.options.sidebar.quickSliders.showVolume = checked;
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "mic"
+                text: Translation.tr("Microphone")
+                enabled: Config.options.sidebar.quickSliders.enable
+                checked: Config.options.sidebar.quickSliders.showMic
+                onCheckedChanged: {
+                    Config.options.sidebar.quickSliders.showMic = checked;
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Corner open")
+            tooltip: Translation.tr("Allows you to open sidebars by clicking or hovering screen corners regardless of bar position")
+            ConfigRow {
+                uniform: true
+                ConfigSwitch {
+                    buttonIcon: "check"
+                    text: Translation.tr("Enable")
+                    checked: Config.options.sidebar.cornerOpen.enable
+                    onCheckedChanged: {
+                        Config.options.sidebar.cornerOpen.enable = checked;
+                    }
+                }
+            }
+            ConfigSwitch {
+                buttonIcon: "highlight_mouse_cursor"
+                text: Translation.tr("Hover to trigger")
+                checked: Config.options.sidebar.cornerOpen.clickless
+                onCheckedChanged: {
+                    Config.options.sidebar.cornerOpen.clickless = checked;
+                }
+
+                StyledToolTip {
+                    text: Translation.tr("When this is off you'll have to click")
+                }
+            }
+            Row {
+                ConfigSwitch {
+                    enabled: !Config.options.sidebar.cornerOpen.clickless
+                    text: Translation.tr("Force hover open at absolute corner")
+                    checked: Config.options.sidebar.cornerOpen.clicklessCornerEnd
+                    onCheckedChanged: {
+                        Config.options.sidebar.cornerOpen.clicklessCornerEnd = checked;
+                    }
+
+                    StyledToolTip {
+                        text: Translation.tr("When the previous option is off and this is on,\nyou can still hover the corner's end to open sidebar,\nand the remaining area can be used for volume/brightness scroll")
+                    }
+                }
+                ConfigSpinBox {
+                    icon: "arrow_cool_down"
+                    text: Translation.tr("with vertical offset")
+                    value: Config.options.sidebar.cornerOpen.clicklessCornerVerticalOffset
+                    from: 0
+                    to: 20
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.options.sidebar.cornerOpen.clicklessCornerVerticalOffset = value;
+                    }
+                    // Antes esto era un MouseArea con anchors.fill adentro de un
+                    // layout (comportamiento indefinido segun Qt). ConfigSpinBox ya
+                    // expone `hovered`, asi que el tooltip solo alcanza.
+                    StyledToolTip {
+                        text: Translation.tr("Why this is cool:\nFor non-0 values, it won't trigger when you reach the\nscreen corner along the horizontal edge, but it will when\nyou do along the vertical edge")
+                    }
+                }
+            }
+            
+            ConfigRow {
+                uniform: true
+                ConfigSwitch {
+                    buttonIcon: "vertical_align_bottom"
+                    text: Translation.tr("Place at bottom")
+                    checked: Config.options.sidebar.cornerOpen.bottom
+                    onCheckedChanged: {
+                        Config.options.sidebar.cornerOpen.bottom = checked;
+                    }
+
+                    StyledToolTip {
+                        text: Translation.tr("Place the corners to trigger at the bottom")
+                    }
+                }
+                ConfigSwitch {
+                    buttonIcon: "unfold_more_double"
+                    text: Translation.tr("Value scroll")
+                    checked: Config.options.sidebar.cornerOpen.valueScroll
+                    onCheckedChanged: {
+                        Config.options.sidebar.cornerOpen.valueScroll = checked;
+                    }
+
+                    StyledToolTip {
+                        text: Translation.tr("Brightness and volume")
+                    }
+                }
+            }
+            ConfigSwitch {
+                buttonIcon: "visibility"
+                text: Translation.tr("Visualize region")
+                checked: Config.options.sidebar.cornerOpen.visualize
+                onCheckedChanged: {
+                    Config.options.sidebar.cornerOpen.visualize = checked;
+                }
+            }
+            ConfigRow {
+                ConfigSpinBox {
+                    icon: "arrow_range"
+                    text: Translation.tr("Region width")
+                    value: Config.options.sidebar.cornerOpen.cornerRegionWidth
+                    from: 1
+                    to: 300
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.options.sidebar.cornerOpen.cornerRegionWidth = value;
+                    }
+                }
+                ConfigSpinBox {
+                    icon: "height"
+                    text: Translation.tr("Region height")
+                    value: Config.options.sidebar.cornerOpen.cornerRegionHeight
+                    from: 1
+                    to: 300
+                    stepSize: 1
+                    onValueChanged: {
+                        Config.options.sidebar.cornerOpen.cornerRegionHeight = value;
+                    }
+                }
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Esquinas de abajo")
+            tooltip: Translation.tr("Qué abre cada esquina inferior cuando el corner open está abajo")
+
+            ConfigComboBox {
+                Layout.fillWidth: true
+                buttonIcon: "position_bottom_left"
+                text: Translation.tr("Abajo a la izquierda")
+                model: page.hotCornerActions
+                currentValue: Config.options.sidebar.cornerOpen.bottomLeftAction
+                onSelected: newValue => {
+                    Config.options.sidebar.cornerOpen.bottomLeftAction = newValue;
+                }
+            }
+
+            ConfigComboBox {
+                Layout.fillWidth: true
+                buttonIcon: "position_bottom_right"
+                text: Translation.tr("Abajo a la derecha")
+                model: page.hotCornerActions
+                currentValue: Config.options.sidebar.cornerOpen.bottomRightAction
+                onSelected: newValue => {
+                    Config.options.sidebar.cornerOpen.bottomRightAction = newValue;
+                }
+            }
+        }
+    }
 
     ContentSection {
         icon: "tab"

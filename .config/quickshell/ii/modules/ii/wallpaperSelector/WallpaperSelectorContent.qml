@@ -48,9 +48,14 @@ MouseArea {
         }
     }
 
+    // "" = todos los monitores. Lo que muestra `Wallpapers.folderModel` como "wallpaper activo"
+    // (resaltado en la grilla) sigue a este mismo monitor.
+    readonly property string targetMonitor: GlobalStates.wallpaperSelectorTargetMonitor
+    readonly property string effectiveWallpaperPath: Wallpapers.effectivePathForMonitor(root.targetMonitor)
+
     function selectWallpaperPath(filePath) {
         if (filePath && filePath.length > 0) {
-            Wallpapers.select(filePath, root.useDarkMode);
+            Wallpapers.select(filePath, root.useDarkMode, root.targetMonitor);
             filterField.text = "";
         }
     }
@@ -217,7 +222,7 @@ MouseArea {
                                 // lector: la carpeta estaba clavada en ~/Pictures/Wallpapers.
                                 path: (Config.options.wallpaperSelector.userPath?.length > 0)
                                     ? Config.options.wallpaperSelector.userPath
-                                    : `${Directories.pictures}/Wallpapers`
+                                    : `${Directories.pictures}/wallpapers`
                             },
                             ...((Config.options.wallpaperSelector.liveWallpapersPath?.length > 0) ? [
                                     {
@@ -272,6 +277,64 @@ MouseArea {
                 id: gridColumnLayout
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+
+                // Elegir a qué monitor se aplica el wallpaper. Con un solo monitor no
+                // tiene sentido, así que ni se dibuja.
+                RowLayout {
+                    id: monitorScopeRow
+                    Layout.fillWidth: true
+                    Layout.margins: 4
+                    Layout.bottomMargin: 0
+                    spacing: 4
+                    visible: Quickshell.screens.length > 1
+
+                    StyledText {
+                        Layout.leftMargin: 4
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnLayer1
+                        text: Translation.tr("Monitor:")
+                    }
+
+                    RippleButton {
+                        id: allMonitorsChip
+                        implicitHeight: 26
+                        buttonRadius: height / 2
+                        toggled: root.targetMonitor === ""
+                        colBackgroundToggled: Appearance.colors.colSecondaryContainer
+                        colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
+                        colRippleToggled: Appearance.colors.colSecondaryContainerActive
+                        onClicked: GlobalStates.wallpaperSelectorTargetMonitor = ""
+                        contentItem: StyledText {
+                            horizontalAlignment: Text.AlignHCenter
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: allMonitorsChip.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                            text: Translation.tr("All")
+                        }
+                    }
+
+                    Repeater {
+                        model: Quickshell.screens
+                        delegate: RippleButton {
+                            id: monitorChip
+                            required property var modelData
+                            implicitHeight: 26
+                            buttonRadius: height / 2
+                            toggled: root.targetMonitor === monitorChip.modelData.name
+                            colBackgroundToggled: Appearance.colors.colSecondaryContainer
+                            colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
+                            colRippleToggled: Appearance.colors.colSecondaryContainerActive
+                            onClicked: GlobalStates.wallpaperSelectorTargetMonitor = monitorChip.modelData.name
+                            contentItem: StyledText {
+                                horizontalAlignment: Text.AlignHCenter
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: monitorChip.toggled ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer1
+                                text: monitorChip.modelData.name
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
 
                 AddressBar {
                     id: addressBar
@@ -348,8 +411,8 @@ MouseArea {
                             fileModelData: modelData
                             width: grid.cellWidth
                             height: grid.cellHeight
-                            colBackground: (index === grid?.currentIndex || containsMouse) ? Appearance.colors.colPrimary : (fileModelData.filePath === Config.options.background.wallpaperPath) ? Appearance.colors.colSecondaryContainer : ColorUtils.transparentize(Appearance.colors.colPrimaryContainer)
-                            colText: (index === grid.currentIndex || containsMouse) ? Appearance.colors.colOnPrimary : (fileModelData.filePath === Config.options.background.wallpaperPath) ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer0
+                            colBackground: (index === grid?.currentIndex || containsMouse) ? Appearance.colors.colPrimary : (fileModelData.filePath === root.effectiveWallpaperPath) ? Appearance.colors.colSecondaryContainer : ColorUtils.transparentize(Appearance.colors.colPrimaryContainer)
+                            colText: (index === grid.currentIndex || containsMouse) ? Appearance.colors.colOnPrimary : (fileModelData.filePath === root.effectiveWallpaperPath) ? Appearance.colors.colOnSecondaryContainer : Appearance.colors.colOnLayer0
 
                             onEntered: {
                                 grid.currentIndex = index;
@@ -427,7 +490,7 @@ MouseArea {
                             IconToolbarButton {
                                 implicitWidth: height
                                 onClicked: {
-                                    Wallpapers.randomFromCurrentFolder();
+                                    Wallpapers.randomFromCurrentFolder(root.useDarkMode, root.targetMonitor);
                                 }
                                 text: "ifl"
                                 StyledToolTip {

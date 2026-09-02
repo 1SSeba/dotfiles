@@ -26,6 +26,7 @@ import QtQuick.Controls
 import Quickshell
 import qs.services
 import qs.modules.common
+import qs.modules.common.widgets
 import qs.modules.settings
 import qs.modules.ii.sidebarRight
 import qs.modules.ii.sidebarRight.calendar
@@ -42,6 +43,8 @@ ApplicationWindow {
 
     ServicesConfig {}
     ProfilePage {}
+    BackgroundConfig { width: 400; height: 600 }
+    WidgetsSubmenu { id: widgetsSubmenuTest; width: 284 }
     BottomWidgetGroup { width: 400; height: 350 }
     CalendarWidget {}
     AgendaWidget { width: 400; height: 350 }
@@ -362,6 +365,53 @@ ApplicationWindow {
         return fallas;
     }
 
+    /**
+     * El switch de "Widgets" del click derecho tiene que reflejar y controlar
+     * "¿se ve en ESTA pantalla?", no el `enable` global — si no, un widget
+     * restringido a otro monitor aparece marcado como activo acá aunque en
+     * realidad no se dibuje en esta pantalla (justo el bug reportado).
+     */
+    function probarWidgetsPorPantalla() {
+        let fallas = 0;
+        const names = Quickshell.screens.map(s => s.name);
+        if (names.length < 2) {
+            console.log("[t] widgets por pantalla: se salta (hacen falta 2+ monitores, hay", names.length + ")");
+            return 0;
+        }
+        const [a, b] = names;
+        const w = Config.options.background.widgets.clock;
+        const antesWidget = { enable: w.enable, screenList: w.screenList };
+        const antesMenu = GlobalStates.desktopMenuScreen;
+        GlobalStates.desktopMenuScreen = Quickshell.screens[0]; // "parado" en la pantalla A
+
+        try {
+            w.enable = true;
+            w.screenList = [];
+            fallas += check("visible en todas: se ve acá", widgetsSubmenuTest.isVisibleHere("clock"));
+
+            widgetsSubmenuTest.setVisibleHere("clock", false); // apagar en A
+            fallas += check("apagar en A: ya no se ve acá", !widgetsSubmenuTest.isVisibleHere("clock"));
+            fallas += check("apagar en A: sigue prendido en general", w.enable);
+            fallas += check("apagar en A: B sigue en la lista",
+                w.screenList.includes(b) && !w.screenList.includes(a));
+
+            widgetsSubmenuTest.setVisibleHere("clock", true); // prender de nuevo en A
+            fallas += check("prender en A: vuelve a verse acá", widgetsSubmenuTest.isVisibleHere("clock"));
+            fallas += check("prender en A: la lista vuelve a la forma canónica (todas)",
+                w.screenList.length === 0);
+
+            // Si A era la única pantalla donde vivía, apagarlo acá lo apaga del todo.
+            w.screenList = [a];
+            widgetsSubmenuTest.setVisibleHere("clock", false);
+            fallas += check("única pantalla: apagar acá apaga del todo", !w.enable);
+        } finally {
+            w.enable = antesWidget.enable;
+            w.screenList = antesWidget.screenList;
+            GlobalStates.desktopMenuScreen = antesMenu;
+        }
+        return fallas;
+    }
+
     Component.onCompleted: {
         console.log("[t] Google:", GoogleAccount.status);
         console.log("[t]   calendario:", GoogleCalendar.enabled, "| tareas:", GoogleTasks.enabled);
@@ -395,6 +445,9 @@ ApplicationWindow {
         const fallasAgentes = probarAgentes();
         console.log("[t] arbol multi-agente ->", fallasAgentes, "fallas");
         fallas += fallasAgentes;
+        const fallasWidgetsPorPantalla = probarWidgetsPorPantalla();
+        console.log("[t] widgets por pantalla ->", fallasWidgetsPorPantalla, "fallas");
+        fallas += fallasWidgetsPorPantalla;
         console.log("[t] TOTAL de fallas:", fallas);
         Qt.quit();
     }

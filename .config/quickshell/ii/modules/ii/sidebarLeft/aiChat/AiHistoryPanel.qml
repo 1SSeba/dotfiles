@@ -180,6 +180,13 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: 8
         spacing: 8
+        // El panel ahora vive siempre adentro del RowLayout del sidebar (para
+        // que cerrar el historial anime igual de suave que abrirlo, ver
+        // SidebarLeft.qml), así que en reposo "cerrado" este ancho es 0 de
+        // verdad, no un valor transitorio. Sin este visible, los 8px de
+        // margins de cada lado dejan el contenido con ancho negativo todo el
+        // tiempo que está cerrado y tira warnings todo el rato.
+        visible: root.width > 20
 
         // ------------------------------ Encabezado
         RowLayout {

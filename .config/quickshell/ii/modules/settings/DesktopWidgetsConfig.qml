@@ -8,133 +8,6 @@ ContentPage {
     forceWidth: true
 
     ContentSection {
-        icon: "transition_fade"
-        title: Translation.tr("Wallpaper transition")
-
-        ConfigComboBox {
-            Layout.fillWidth: true
-            buttonIcon: "animation"
-            text: Translation.tr("Animation")
-            description: Translation.tr("Shader used when the wallpaper changes")
-            currentValue: Config.options.background.wallpaperAnimation
-            model: [
-                { displayName: Translation.tr("None"), value: "" },
-                { displayName: Translation.tr("Random"), value: "random" },
-                { displayName: "Circle pit", value: "circlePit" },
-                { displayName: "Circle select", value: "circleSelect" },
-                { displayName: "Magic", value: "magic" },
-                { displayName: "Doom", value: "Doom" },
-                { displayName: "Peel", value: "Peel" },
-                { displayName: "Slide", value: "transition" },
-                { displayName: "Pixelate", value: "pixelate" },
-                { displayName: "Stripes", value: "stripes" },
-                { displayName: "CRT", value: "crt" },
-                { displayName: "Dissolve", value: "dissolve" },
-                { displayName: "Glitch", value: "glitch" },
-                { displayName: "Ripple", value: "ripple" },
-                { displayName: "Shatter", value: "shatter" },
-            ]
-            onSelected: newValue => {
-                Config.options.background.wallpaperAnimation = newValue;
-            }
-        }
-
-        ConfigSpinBox {
-            icon: "timer"
-            text: Translation.tr("Duration (ms)")
-            value: Config.options.background.wallpaperAnimationDuration
-            from: 200
-            to: 5000
-            stepSize: 100
-            enabled: Config.options.background.wallpaperAnimation !== ""
-            onValueChanged: {
-                Config.options.background.wallpaperAnimationDuration = value;
-            }
-        }
-    }
-
-    ContentSection {
-        icon: "wallpaper"
-        title: Translation.tr("Wallpaper")
-
-        // Al pasar el mouse por la grilla del selector ya se ve puesto en el escritorio;
-        // es cómodo pero recarga el wallpaper todo el tiempo, por eso viene apagado
-        ConfigSwitch {
-            buttonIcon: "preview"
-            text: Translation.tr("Previsualizar al pasar el mouse en el selector")
-            checked: Config.options.background.enableWallpaperPreview
-            onCheckedChanged: {
-                Config.options.background.enableWallpaperPreview = checked;
-            }
-        }
-
-        ConfigSwitch {
-            buttonIcon: "fullscreen"
-            text: Translation.tr("Hide desktop widgets in fullscreen apps")
-            checked: Config.options.background.hideWhenFullscreen
-            onCheckedChanged: {
-                Config.options.background.hideWhenFullscreen = checked;
-            }
-        }
-
-        // El wallpaper centrado (figura, tamaño y color de fondo) se toca desde el escritorio:
-        // click derecho -> submenú de wallpaper, donde se ve el cambio en vivo. No lo duplicamos acá.
-        StyledText {
-            Layout.leftMargin: 10
-            Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            color: Appearance.colors.colSubtext
-            font.pixelSize: Appearance.font.pixelSize.smallie
-            text: Translation.tr("El wallpaper centrado (figura, tamaño y color) se configura con click derecho en el escritorio → Wallpaper")
-        }
-    }
-
-    ContentSection {
-        icon: "sync_alt"
-        title: Translation.tr("Parallax")
-
-        ConfigSwitch {
-            buttonIcon: "unfold_more_double"
-            text: Translation.tr("Vertical")
-            checked: Config.options.background.parallax.vertical
-            onCheckedChanged: {
-                Config.options.background.parallax.vertical = checked;
-            }
-        }
-
-        ConfigRow {
-            uniform: true
-            ConfigSwitch {
-                buttonIcon: "counter_1"
-                text: Translation.tr("Depends on workspace")
-                checked: Config.options.background.parallax.enableWorkspace
-                onCheckedChanged: {
-                    Config.options.background.parallax.enableWorkspace = checked;
-                }
-            }
-            ConfigSwitch {
-                buttonIcon: "side_navigation"
-                text: Translation.tr("Depends on sidebars")
-                checked: Config.options.background.parallax.enableSidebar
-                onCheckedChanged: {
-                    Config.options.background.parallax.enableSidebar = checked;
-                }
-            }
-        }
-        ConfigSpinBox {
-            icon: "loupe"
-            text: Translation.tr("Preferred wallpaper zoom (%)")
-            value: Config.options.background.parallax.workspaceZoom * 100
-            from: 10
-            to: 200
-            stepSize: 1
-            onValueChanged: {
-                Config.options.background.parallax.workspaceZoom = value / 100;
-            }
-        }
-    }
-
-    ContentSection {
         id: settingsClock
         icon: "clock_loader_40"
         title: Translation.tr("Widget: Clock")
@@ -203,6 +76,11 @@ ContentPage {
                     },
                 ]
             }
+        }
+
+        ConfigScreenList {
+            screenList: Config.options.background.widgets.clock.screenList
+            onChanged: newList => Config.options.background.widgets.clock.screenList = newList
         }
 
         ContentSubsection {
@@ -789,6 +667,11 @@ ContentPage {
             }
         }
 
+        ConfigScreenList {
+            screenList: Config.options.background.widgets.weather.screenList
+            onChanged: newList => Config.options.background.widgets.weather.screenList = newList
+        }
+
         ContentSubsection {
             title: Translation.tr("Tamaño")
             tooltip: Translation.tr("Cuánta info entra en la tarjeta: lo mismo que se logra estirándola con el mouse")
@@ -864,6 +747,11 @@ ContentPage {
                 ]
             }
         }
+
+        ConfigScreenList {
+            screenList: Config.options.background.widgets.calendar.screenList
+            onChanged: newList => Config.options.background.widgets.calendar.screenList = newList
+        }
     }
 
     ContentSection {
@@ -920,70 +808,124 @@ ContentPage {
                 },
             ]
         }
+
+        ConfigScreenList {
+            screenList: Config.options.background.widgets.resources.screenList
+            onChanged: newList => Config.options.background.widgets.resources.screenList = newList
+        }
     }
 
-    /**
-     * Estos widgets ya viven en el escritorio (Background.qml los instancia) pero hasta
-     * ahora sólo se prendían desde el click derecho. Acá van sólo los interruptores:
-     * la posición y el tamaño se ajustan arrastrándolos.
-     */
     ContentSection {
         icon: "dashboard_customize"
         title: Translation.tr("Otros widgets del fondo")
 
-        ConfigSwitch {
-            buttonIcon: "music_note"
-            text: Translation.tr("Reproductor")
-            checked: Config.options.background.widgets.media.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.media.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "music_note"
+                text: Translation.tr("Reproductor")
+                checked: Config.options.background.widgets.media.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.media.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.media.screenList
+                onChanged: newList => Config.options.background.widgets.media.screenList = newList
             }
         }
 
-        ConfigSwitch {
-            buttonIcon: "graphic_eq"
-            text: Translation.tr("Visualizador de audio")
-            checked: Config.options.background.widgets.visualizer.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.visualizer.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "graphic_eq"
+                text: Translation.tr("Visualizador de audio")
+                checked: Config.options.background.widgets.visualizer.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.visualizer.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.visualizer.screenList
+                onChanged: newList => Config.options.background.widgets.visualizer.screenList = newList
             }
         }
 
-        ConfigSwitch {
-            buttonIcon: "person"
-            text: Translation.tr("Tarjeta de usuario")
-            checked: Config.options.background.widgets.userCard.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.userCard.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "person"
+                text: Translation.tr("Tarjeta de usuario")
+                checked: Config.options.background.widgets.userCard.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.userCard.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.userCard.screenList
+                onChanged: newList => Config.options.background.widgets.userCard.screenList = newList
             }
         }
 
-        ConfigSwitch {
-            buttonIcon: "public"
-            text: Translation.tr("Reloj mundial")
-            checked: Config.options.background.widgets.worldClock.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.worldClock.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "public"
+                text: Translation.tr("Reloj mundial")
+                checked: Config.options.background.widgets.worldClock.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.worldClock.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.worldClock.screenList
+                onChanged: newList => Config.options.background.widgets.worldClock.screenList = newList
             }
         }
 
-        ConfigSwitch {
-            buttonIcon: "note_stack_add"
-            text: Translation.tr("Notas")
-            checked: Config.options.background.widgets.notes.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.notes.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "note_stack_add"
+                text: Translation.tr("Notas")
+                checked: Config.options.background.widgets.notes.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.notes.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.notes.screenList
+                onChanged: newList => Config.options.background.widgets.notes.screenList = newList
             }
         }
 
         // La imagen se elige desde el propio widget (arrastrándola o con el selector);
         // la forma del recorte sólo se puede cambiar desde acá.
-        ConfigSwitch {
-            buttonIcon: "image"
-            text: Translation.tr("Imagen personalizada")
-            checked: Config.options.background.widgets.customImage.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.customImage.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "image"
+                text: Translation.tr("Imagen personalizada")
+                checked: Config.options.background.widgets.customImage.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.customImage.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.customImage.screenList
+                onChanged: newList => Config.options.background.widgets.customImage.screenList = newList
             }
         }
 
@@ -1003,12 +945,21 @@ ContentPage {
             }
         }
 
-        ConfigSwitch {
-            buttonIcon: "photo_library"
-            text: Translation.tr("Conversor de imágenes")
-            checked: Config.options.background.widgets.images.enable
-            onCheckedChanged: {
-                Config.options.background.widgets.images.enable = checked;
+        ConfigRow {
+            Layout.fillWidth: true
+            ConfigSwitch {
+                Layout.fillWidth: false
+                buttonIcon: "photo_library"
+                text: Translation.tr("Conversor de imágenes")
+                checked: Config.options.background.widgets.images.enable
+                onCheckedChanged: {
+                    Config.options.background.widgets.images.enable = checked;
+                }
+            }
+            Item { Layout.fillWidth: true }
+            ConfigScreenList {
+                screenList: Config.options.background.widgets.images.screenList
+                onChanged: newList => Config.options.background.widgets.images.screenList = newList
             }
         }
     }
@@ -1032,6 +983,18 @@ ContentPage {
             checked: Config.options.background.widgetsLocked
             onCheckedChanged: {
                 Config.options.background.widgetsLocked = checked;
+            }
+        }
+
+        ConfigSwitch {
+            buttonIcon: "select_all"
+            text: Translation.tr("Compartir widgets nuevos entre pantallas")
+            checked: Config.options.background.shareWidgetsAcrossScreens
+            onCheckedChanged: {
+                Config.options.background.shareWidgetsAcrossScreens = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Al prender un widget apagado desde el menú del click derecho, aparece en todos los monitores en vez de sólo en el que clickeaste.")
             }
         }
 
@@ -1071,5 +1034,4 @@ ContentPage {
             }
         }
     }
-
 }
