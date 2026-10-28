@@ -80,7 +80,7 @@ con el resto y al final lista lo que quedó pendiente. Todo queda registrado en
 **De dónde salen las dependencias:** "illogical impulse" es el nombre del rice de end-4,
 así que `setup.sh` clona `end-4/dots-hyprland` y construye sus metapaquetes
 `illogical-impulse-*` desde `sdata/dist-arch/` (no están publicados en el AUR).
-Son 91 paquetes de repos oficiales + 9 del AUR + 13 metapaquetes. El entorno Python
+Son 99 paquetes de repos oficiales + 11 del AUR + 13 metapaquetes. El entorno Python
 sale del `sdata/uv/requirements.txt` fijado por el upstream. La lista completa,
 ordenada por sección, está en `packages.txt`.
 

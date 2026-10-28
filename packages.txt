@@ -1,5 +1,5 @@
 # Dependencias (Arch / CachyOS). setup.sh las instala en este mismo orden.
-# 91 vienen de los repos oficiales y 9 del AUR; los metapaquetes se compilan
+# 99 vienen de los repos oficiales y 11 del AUR; los metapaquetes se compilan
 # desde el repo de end-4 porque no están publicados en el AUR.
 
 # ============================================================================
