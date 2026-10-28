@@ -338,7 +338,7 @@ sec8_servicios() {
     systemctl --user enable --now "$s" >>"$LOG" 2>&1 && ok "usuario: $s" || warn "usuario: $s no disponible"
   done
   if ! id -nG | tr ' ' '\n' | grep -qx input; then
-    sudo usermod -aG input "$USER" >>"$LOG" 2>&1 \
+    sudo usermod -aG input "${USER:-$(id -un)}" >>"$LOG" 2>&1 \
       && warn "te agregué al grupo 'input' (ydotool): hace falta reiniciar sesión" \
       || warn "no pude agregarte al grupo 'input'"
   else
