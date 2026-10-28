@@ -166,7 +166,8 @@ Item {
                             // antes de que se evalúen las bindings.
                             webLoader.setSource("social/SocialWebView.qml", {
                                 "startUrl": page.url,
-                                "storageName": page.storageName
+                                "storageName": page.storageName,
+                                "persistCookies": Config.options?.sidebar?.social?.persistCookies ?? false
                             });
                         }
                     }

@@ -11,6 +11,8 @@ import qs.modules.ii.overlay.volumeMixer
 import qs.modules.ii.overlay.floatingImage
 import qs.modules.ii.overlay.fpsLimiter
 import qs.modules.ii.overlay.recorder
+import qs.modules.ii.overlay.recordingIndicator
+import qs.modules.ii.overlay.sceneEditor
 import qs.modules.ii.overlay.resources
 import qs.modules.ii.overlay.notes
 
@@ -22,6 +24,8 @@ DelegateChooser {
     DelegateChoice { roleValue: "floatingImage"; FloatingImage {} }
     DelegateChoice { roleValue: "fpsLimiter"; FpsLimiter {} }
     DelegateChoice { roleValue: "recorder"; Recorder {} }
+    DelegateChoice { roleValue: "recordingIndicator"; RecordingIndicator {} }
+    DelegateChoice { roleValue: "sceneEditor"; SceneEditor {} }
     DelegateChoice { roleValue: "resources"; Resources {} }
     DelegateChoice { roleValue: "notes"; Notes {} }
     DelegateChoice { roleValue: "volumeMixer"; VolumeMixer {} }

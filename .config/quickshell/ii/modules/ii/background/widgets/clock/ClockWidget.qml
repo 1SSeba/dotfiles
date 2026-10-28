@@ -12,6 +12,9 @@ AbstractBackgroundWidget {
     id: root
 
     configEntryName: "clock"
+    // Se agranda y achica entero con la manija (ver AbstractBackgroundWidget)
+    scalable: true
+    hoverEnabled: true
 
     implicitHeight: contentColumn.implicitHeight
     implicitWidth: contentColumn.implicitWidth

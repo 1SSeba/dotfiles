@@ -11,6 +11,9 @@ AbstractBackgroundWidget {
     id: root
 
     configEntryName: "weather"
+    // Se agranda y achica entero con la manija (ver AbstractBackgroundWidget)
+    scalable: true
+    hoverEnabled: true
 
     implicitHeight: backgroundShape.implicitHeight
     implicitWidth: backgroundShape.implicitWidth

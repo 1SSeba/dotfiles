@@ -57,8 +57,15 @@ Singleton {
     property string userAiPrompts: FileUtils.trimFileProtocol(`${Directories.shellConfig}/ai/prompts`)
     property string userActions: FileUtils.trimFileProtocol(`${Directories.shellConfig}/actions`)
     property string aiChats: FileUtils.trimFileProtocol(`${Directories.state}/user/ai/chats`)
+    // Perfiles de QtWebEngine de las webapps del sidebar (una carpeta por red).
+    // Va a un path explícito y no al default de Qt (AppDataLocation + storageName)
+    // porque ese depende del nombre de app con el que arranque Quickshell: si
+    // cambia, cambian las cookies de lugar y todas las redes aparecen deslogueadas.
+    property string socialProfiles: FileUtils.trimFileProtocol(`${Directories.state}/user/social`)
+    property string socialProfilesCache: FileUtils.trimFileProtocol(`${Directories.cache}/social`)
     property string aiTranslationScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/ai/gemini-translate.sh`)
     property string recordScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/videos/record.sh`)
+    property string sceneRecordScriptPath: FileUtils.trimFileProtocol(`${Directories.scriptPath}/videos/scene_record.sh`)
     property string userAvatarPathAccountsService: FileUtils.trimFileProtocol(`/var/lib/AccountsService/icons/${SystemInfo.username}`)
     property string userAvatarPathRicersAndWeirdSystems: FileUtils.trimFileProtocol(`${Directories.home}.face`)
     property string userAvatarPathRicersAndWeirdSystems2: FileUtils.trimFileProtocol(`${Directories.home}.face.icon`)
@@ -79,6 +86,7 @@ Singleton {
         Quickshell.execDetached(["bash", "-c", `rm -rf '${latexOutput}'; mkdir -p '${latexOutput}'`])
         Quickshell.execDetached(["bash", "-c", `rm -rf '${cliphistDecode}'; mkdir -p '${cliphistDecode}'`])
         Quickshell.execDetached(["mkdir", "-p", `${aiChats}`])
+        Quickshell.execDetached(["mkdir", "-p", `${socialProfiles}`])
         Quickshell.execDetached(["mkdir", "-p", `${userActions}`])
         Quickshell.execDetached(["rm", "-rf", `${tempImages}`])
     }

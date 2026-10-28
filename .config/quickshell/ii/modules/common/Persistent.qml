@@ -38,6 +38,22 @@ Singleton {
         }
     }
 
+    // Pinea/despinea el widget flotante de grabación en el overlay junto con
+    // record.enable, para que aparezca por encima de todo apenas arranca una
+    // grabación (record.sh / scene_record.sh) sin que el usuario tenga que
+    // abrir Super+G y pinearlo a mano.
+    Connections {
+        target: root.states.record
+        function onEnableChanged() {
+            if (!root.ready) return;
+            if (!Config.options.screenRecord.showIndicator) return;
+            root.states.overlay.recordingIndicator.pinned = root.states.record.enable;
+            if (root.states.record.enable && !root.states.overlay.open.includes("recordingIndicator")) {
+                root.states.overlay.open = [...root.states.overlay.open, "recordingIndicator"];
+            }
+        }
+    }
+
     FileView {
         id: persistentStatesFileView
         path: root.filePath
@@ -104,6 +120,11 @@ Singleton {
             // pueda mostrar el ícono de "detener" y el tiempo transcurrido.
             property JsonObject record: JsonObject {
                 property bool enable: false
+                // Epoch (segundos) en que arrancó la grabación actual. Se usa en vez de
+                // un Timer local para que el tiempo transcurrido sea el mismo en
+                // cualquier widget que lo muestre (barra, indicador flotante) aunque se
+                // recreen a mitad de la grabación.
+                property int startEpoch: 0
             }
 
             property JsonObject overlay: JsonObject {
@@ -139,6 +160,22 @@ Singleton {
                     property real y: 80
                     property real width: 350
                     property real height: 130
+                }
+                property JsonObject recordingIndicator: JsonObject {
+                    property bool pinned: false
+                    property bool clickthrough: true
+                    property real x: 20
+                    property real y: 20
+                    property real width: 160
+                    property real height: 60
+                }
+                property JsonObject sceneEditor: JsonObject {
+                    property bool pinned: false
+                    property bool clickthrough: false
+                    property real x: 400
+                    property real y: 150
+                    property real width: 640
+                    property real height: 480
                 }
                 property JsonObject resources: JsonObject {
                     property bool pinned: false

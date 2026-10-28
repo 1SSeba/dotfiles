@@ -178,9 +178,15 @@ ContentPage {
                     id: sensitivitySlider
                     buttonIcon: "speed"
                     text: Translation.tr("Sensitivity")
+                    tooltip: Translation.tr("-1 to 1. 0 is neutral (1:1, no extra scaling) — the closest match to the default Windows pointer speed (slider position 6/11). Move right for faster, left for slower.")
                     usePercentTooltip: false
+                    tooltipContent: `${Math.round(sensitivitySlider.value * 100) / 100}`
                     from: -1.0
                     to: 1.0
+                    stepSize: 0.05
+                    snapToStep: true
+                    dividerValues: [-0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75]
+                    stopIndicatorValues: [0]
                     property bool initialized: false
                     Component.onCompleted: {
                         sensitivitySlider.value = Config.options.hyprland.input.mouse.sensitivity
@@ -197,6 +203,7 @@ ContentPage {
 
                 ContentSubsection {
                     title: Translation.tr("Acceleration profile")
+                    tooltip: Translation.tr("Flat = no acceleration curve, movement is 1:1 — matches Windows with \"Enhance pointer precision\" turned OFF. Adaptive = libinput's own acceleration curve — closest to Windows with that option turned ON (the Windows default). Default lets the driver decide.")
                     Layout.fillWidth: true
 
                     ConfigSelectionArray {
@@ -211,6 +218,73 @@ ContentPage {
                             { displayName: Translation.tr("Flat"),     icon: "horizontal_rule",   value: "flat"     },
                         ]
                     }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Item { Layout.fillWidth: true }
+                RippleButtonWithIcon {
+                    id: windowsPresetButton
+                    materialIcon: "history"
+                    property bool justApplied: false
+                    mainText: justApplied
+                        ? Translation.tr("Applied: flat, sensitivity 0")
+                        : Translation.tr("Match Windows default (no pointer precision, slider 6/11)")
+                    onClicked: {
+                        sensitivitySlider.value = 0
+                        if (Config.options.hyprland.input.mouse.accelProfile !== "flat") {
+                            Config.options.hyprland.input.mouse.accelProfile = "flat"
+                            HyprlandConfig.set("input:accel_profile", "flat")
+                        }
+                        windowsPresetButton.justApplied = true
+                        windowsPresetRevertTimer.restart()
+                    }
+                    Timer {
+                        id: windowsPresetRevertTimer
+                        interval: 1500
+                        repeat: false
+                        onTriggered: windowsPresetButton.justApplied = false
+                    }
+                }
+            }
+
+            NoticeBox {
+                id: sensitivityCheck
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                // Hyprland solo permite sensibilidad global o por dispositivo — nunca
+                // por monitor. Si el mouse "se siente" distinto en una pantalla, no es
+                // la config: son tasas de refresco distintas combinadas con cursor por
+                // hardware (frecuente con NVIDIA), visibles en `hyprctl monitors -j`.
+                // Forzar cursor:no_hardware_cursors iguala el comportamiento entre
+                // monitores sin tocar sus Hz — por eso "todos por software" es el
+                // estado sano, y lo que hay que marcar es una mezcla hw/sw.
+                property var monitorRates: HyprlandData.monitors.map(m => Math.round(m.refreshRate * 100) / 100)
+                property bool ratesDiffer: monitorRates.length > 1 && (Math.max(...monitorRates) - Math.min(...monitorRates) > 1)
+                property var cursorModes: [...new Set(HyprlandData.monitors.map(m => m.hardwareCursorsInUse))]
+                property bool cursorModeMixed: cursorModes.length > 1
+                property bool allSoftwareCursor: HyprlandData.monitors.length > 0 && cursorModes.length === 1 && cursorModes[0] === false
+                property bool riskyHwRateMismatch: ratesDiffer && !allSoftwareCursor
+                materialIcon: (cursorModeMixed || riskyHwRateMismatch) ? "warning" : "check_circle"
+                text: {
+                    const sens = Config.options.hyprland.input.mouse.sensitivity
+                    const prof = Config.options.hyprland.input.mouse.accelProfile || Translation.tr("default")
+                    let msg = Translation.tr("Verified: sensitivity is ONE global value (%1, profile: %2) applied to every mouse on every monitor — Hyprland has no concept of per-monitor pointer sensitivity.")
+                        .arg(sens).arg(prof)
+                    if (sensitivityCheck.cursorModeMixed) {
+                        const list = HyprlandData.monitors.map(m => `${m.name}: ${m.hardwareCursorsInUse ? "hw" : "sw"}`).join(", ")
+                        msg += "\n\n" + Translation.tr("⚠ Monitors don't agree on cursor mode (%1) — that mismatch alone can make the pointer feel different per screen. Consider forcing cursor:no_hardware_cursors = true for all of them.")
+                            .arg(list)
+                    } else if (sensitivityCheck.riskyHwRateMismatch) {
+                        const list = HyprlandData.monitors.map(m => `${m.name} (${Math.round(m.refreshRate)}Hz)`).join(", ")
+                        msg += "\n\n" + Translation.tr("⚠ Your monitors run at different refresh rates (%1) using hardware cursors. That's a known Hyprland/NVIDIA quirk that can make the cursor feel faster or slower depending on which screen it's on — not the sensitivity setting. Try cursor:no_hardware_cursors = true to keep your Hz but even it out.")
+                            .arg(list)
+                    } else if (sensitivityCheck.allSoftwareCursor && sensitivityCheck.ratesDiffer) {
+                        msg += "\n\n" + Translation.tr("✓ cursor:no_hardware_cursors is active — all monitors use software cursor uniformly, so the differing refresh rates shouldn't cause a per-monitor speed difference anymore.")
+                    }
+                    return msg
                 }
             }
         }

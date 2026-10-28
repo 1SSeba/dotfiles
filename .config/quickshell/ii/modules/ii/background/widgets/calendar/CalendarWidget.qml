@@ -23,36 +23,21 @@ AbstractBackgroundWidget {
 
     property string sizeMode: root.configEntry.sizeMode ?? "2x2"
 
-    property real widgetWidth: {
-        switch (root.sizeMode) {
-            case "1x1": return snapWidth1
-            case "1x2": return snapWidth2
-            default:    return snapWidth3
-        }
+    // Estirar como las notas: la tarjeta sigue al mouse y el contenido pasa
+    // al modo más cercano (ver ElasticResize).
+    ElasticResize {
+        id: elastic
+        widget: root
+        mode: root.sizeMode
+        modes: [
+            { "mode": "1x1", "width": root.snapWidth1, "height": root.cardHeight },
+            { "mode": "1x2", "width": root.snapWidth2, "height": root.cardHeight },
+            { "mode": "2x2", "width": root.snapWidth3, "height": root.cardHeight * 2 + root.cardSpacing }
+        ]
     }
 
-    function modeForWidth(value) {
-        var mid1 = (snapWidth1 + snapWidth2) / 2
-        if (value < mid1) return "1x1"
-        return root.sizeMode === "1x2" ? "1x2" : "2x2"
-    }
-
-    readonly property real heightToggleFraction: 0.3
-    readonly property real heightToggleDelta: (root.cardHeight * 2 + root.cardSpacing - root.cardHeight) * root.heightToggleFraction
-
-    function modeForDrag(dx, dy, startWidth) {
-        var mid = (root.snapWidth1 + root.snapWidth2) / 2
-        var newWidth = startWidth + dx
-
-        if (newWidth < mid) return "1x1"
-
-        if (root.sizeMode === "1x1") {
-            return dy > root.heightToggleDelta ? "2x2" : "1x2"
-        }
-        if (dy > root.heightToggleDelta) return "2x2"
-        if (dy < -root.heightToggleDelta) return "1x2"
-        return root.sizeMode 
-    }
+    property real widgetWidth: elastic.resizing ? elastic.dragWidth : elastic.current.width
+    property real widgetHeight: elastic.resizing ? elastic.dragHeight : elastic.current.height
 
     property int monthShift: 0
     readonly property var today: new Date()
@@ -147,7 +132,58 @@ AbstractBackgroundWidget {
     // (para reacomodarlos); si eso pasa con el selector abierto, mejor
     // cerrarlo que dejarlo compitiendo con el arrastre del widget.
     readonly property bool widgetsLocked: Config.options.background.widgetsLocked
-    onWidgetsLockedChanged: if (!widgetsLocked) root.showMonthYearPicker = false
+    onWidgetsLockedChanged: if (!widgetsLocked) {
+        root.showMonthYearPicker = false
+        root.showDayEvents = false
+    }
+
+    // Panel con los eventos de un día. Antes tocar un día mandaba directo al
+    // calendario web; ahora se ven acá mismo y el navegador queda como opción.
+    // En 1x1 no hay grilla de días que tocar, así que ahí nunca se abre.
+    property bool showDayEvents: false
+    property var selectedDate: new Date()
+    readonly property string selectedDateKey: root.localDateKey(root.selectedDate)
+    readonly property var selectedEvents: Calendars.eventsByDate[root.selectedDateKey] ?? []
+    onSizeModeChanged: if (root.sizeMode === "1x1") root.showDayEvents = false
+
+    function openDayEvents(dateKey) {
+        const parts = String(dateKey).split("-").map(Number)
+        // Al mediodía, como las celdas: lejos de los cambios de horario.
+        root.selectedDate = new Date(parts[0], parts[1] - 1, parts[2], 12)
+        root.showMonthYearPicker = false
+        root.showDayEvents = true
+    }
+
+    function shiftSelectedDay(delta) {
+        const d = root.selectedDate
+        root.selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta, 12)
+        // Pasando de día se puede salir del mes que se estaba mirando (y de la
+        // ventana de eventos que ya se pidió).
+        if (Calendars.enabled) {
+            const s = root.selectedDate
+            Calendars.ensureWindow(new Date(s.getFullYear(), s.getMonth() - 1, 1),
+                                   new Date(s.getFullYear(), s.getMonth() + 2, 1))
+        }
+    }
+
+    function sameDay(a, b) {
+        return a.getFullYear() === b.getFullYear()
+            && a.getMonth() === b.getMonth()
+            && a.getDate() === b.getDate()
+    }
+
+    /** "10:00 – 11:30", "Todo el día", o con fecha si el evento cruza días. Igual que CalendarDayView. */
+    function eventTimeText(ev) {
+        if (ev.allDay) return Translation.tr("Todo el día")
+        const start = ev.start
+        const end = ev.end ?? ev.start
+        const hhmm = d => d.toLocaleTimeString(Qt.locale(), "HH:mm")
+        const withDay = d => d.toLocaleDateString(Qt.locale(), "d MMM") + " " + hhmm(d)
+        const startText = root.sameDay(start, root.selectedDate) ? hhmm(start) : withDay(start)
+        if (end.getTime() === start.getTime()) return startText
+        const endText = root.sameDay(end, root.selectedDate) ? hhmm(end) : withDay(end)
+        return `${startText} – ${endText}`
+    }
 
     /**
      * Al cambiar de mes hay que asegurarse de que Calendars ya tenga esos
@@ -166,8 +202,46 @@ AbstractBackgroundWidget {
     implicitWidth:  card.implicitWidth
     implicitHeight: card.implicitHeight
 
+    // Siguiendo al mouse, sin animar; al soltar, se acomoda al tamaño del modo.
     Behavior on widgetWidth {
+        enabled: !elastic.resizing
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
+    }
+    Behavior on widgetHeight {
+        enabled: !elastic.resizing
+        animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
+    }
+
+    // El botón redondo de las flechas, para el panel de eventos del día.
+    component FlyoutButton: Rectangle {
+        id: flyoutButton
+        property string icon: ""
+        property bool bordered: true
+        signal clicked()
+
+        implicitWidth: 26; implicitHeight: 26; radius: 13
+        color: flyoutButtonArea.containsMouse
+            ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.75)
+            : "transparent"
+        border.width: flyoutButton.bordered ? 1 : 0
+        border.color: Appearance.colors.colPrimary
+        Behavior on color {
+            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+        }
+
+        MaterialSymbol {
+            anchors.centerIn: parent
+            text: flyoutButton.icon
+            iconSize: Appearance.font.pixelSize.normal
+            color: Appearance.colors.colOnPrimaryContainer
+        }
+        MouseArea {
+            id: flyoutButtonArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: flyoutButton.clicked()
+        }
     }
 
     component DayCell: Rectangle {
@@ -183,7 +257,12 @@ AbstractBackgroundWidget {
         implicitWidth: 28
         implicitHeight: 28
         radius: 14
-        color: isToday ? Appearance.colors.colPrimary : "transparent"
+        color: isToday ? Appearance.colors.colPrimary
+            : dayArea.containsMouse ? ColorUtils.transparentize(Appearance.colors.colPrimary, 0.75)
+            : "transparent"
+        Behavior on color {
+            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+        }
 
         StyledText {
             anchors.centerIn: parent
@@ -218,23 +297,23 @@ AbstractBackgroundWidget {
             }
         }
 
-        // Igual que en el sidebar: un día con eventos se abre en el
-        // calendario web de un clic. Deshabilitado desbloqueado para no
-        // pisar el arrastre del widget.
+        // Cualquier día abre el panel con sus eventos (también los libres:
+        // "no tengo nada" es una respuesta). Deshabilitado desbloqueado para
+        // no pisar el arrastre del widget.
         MouseArea {
+            id: dayArea
             anchors.fill: parent
-            enabled: cell.eventCount > 0 && Config.options.background.widgetsLocked
+            enabled: Config.options.background.widgetsLocked
+            hoverEnabled: true
             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-            onClicked: Calendars.openDay(cell.dateKey)
+            onClicked: root.openDayEvents(cell.dateKey)
         }
     }
 
     Rectangle {
         id: card
         implicitWidth: root.widgetWidth
-        implicitHeight: root.sizeMode === "1x1" ? root.cardHeight
-                      : root.sizeMode === "1x2" ? root.cardHeight
-                      : root.cardHeight * 2 + root.cardSpacing
+        implicitHeight: root.widgetHeight
         radius: Appearance.rounding?.verylarge ?? 30
         color: Appearance.colors.colPrimaryContainer
 
@@ -243,8 +322,9 @@ AbstractBackgroundWidget {
             z: -2
         }
 
-        Loader {
-            anchors.fill: parent
+        ModeLoader {
+            naturalWidth: elastic.current.width
+            naturalHeight: elastic.current.height
             sourceComponent: {
                 if (root.sizeMode === "1x1") return oneByOneContent
                 if (root.sizeMode === "1x2") return oneByTwoContent
@@ -266,7 +346,16 @@ AbstractBackgroundWidget {
             z: 10
             radius: card.radius
             color: Appearance.colors.colPrimaryContainer
-            visible: root.showMonthYearPicker && root.sizeMode === "2x2"
+            readonly property bool shown: root.showMonthYearPicker && root.sizeMode === "2x2"
+            opacity: shown ? 1 : 0
+            scale: shown ? 1 : 0.94
+            visible: opacity > 0
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            Behavior on scale {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
 
             // Que un clic "atraviese" hacia la grilla de abajo mientras el
             // selector está abierto sería peor que no tener selector.
@@ -383,6 +472,244 @@ AbstractBackgroundWidget {
                                     root.showMonthYearPicker = false
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Eventos del día tocado. Mismo truco que el selector de mes/año: un
+        // Rectangle más encima de la grilla, no un Popup.
+        Rectangle {
+            id: dayFlyout
+            anchors.fill: parent
+            z: 11
+            radius: card.radius
+            color: Appearance.colors.colPrimaryContainer
+            readonly property bool shown: root.showDayEvents && root.sizeMode !== "1x1"
+            // En 1x2 la tarjeta mide 120px: sin pie y con márgenes más chicos
+            // entran uno o dos eventos, y el resto se scrollea.
+            readonly property bool compact: root.sizeMode === "1x2"
+            opacity: shown ? 1 : 0
+            scale: shown ? 1 : 0.94
+            visible: opacity > 0
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            Behavior on scale {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                anchors { fill: parent; margins: dayFlyout.compact ? 12 : 16 }
+                spacing: dayFlyout.compact ? 4 : 8
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    FlyoutButton {
+                        icon: "arrow_back"
+                        bordered: false
+                        onClicked: root.showDayEvents = false
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                        font.pixelSize: Appearance.font.pixelSize.normal
+                        font.weight: Font.Medium
+                        color: Appearance.colors.colOnPrimaryContainer
+                        text: {
+                            const label = root.selectedDate.toLocaleDateString(Qt.locale(), "ddd d MMM")
+                            return root.sameDay(root.selectedDate, new Date())
+                                ? Translation.tr("Hoy") + " · " + label
+                                : label
+                        }
+                    }
+
+                    FlyoutButton {
+                        icon: "chevron_left"
+                        onClicked: root.shiftSelectedDay(-1)
+                    }
+                    FlyoutButton {
+                        icon: "chevron_right"
+                        onClicked: root.shiftSelectedDay(1)
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    // Sin cuenta, cargando, error o día libre: una sola línea
+                    // con ícono, que en 1x2 no hay lugar para más.
+                    RowLayout {
+                        anchors.centerIn: parent
+                        width: Math.min(implicitWidth, parent.width)
+                        visible: root.selectedEvents.length === 0
+                        spacing: 6
+
+                        MaterialSymbol {
+                            text: !Calendars.enabled ? "link_off"
+                                : Calendars.loading ? "hourglass_empty"
+                                : Calendars.lastError.length > 0 ? "error"
+                                : "event_available"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colOnPrimaryContainer
+                            opacity: 0.6
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: !Calendars.enabled ? Translation.tr("Sin cuenta conectada")
+                                : Calendars.loading ? Translation.tr("Cargando…")
+                                : Calendars.lastError.length > 0 ? Translation.tr("No se pudo leer el calendario")
+                                : Translation.tr("Día libre")
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            color: Appearance.colors.colOnPrimaryContainer
+                            opacity: 0.7
+                        }
+                    }
+
+                    StyledListView {
+                        id: dayEventList
+                        anchors.fill: parent
+                        visible: root.selectedEvents.length > 0
+                        clip: true
+                        spacing: 4
+                        model: root.selectedEvents
+
+                        delegate: Rectangle {
+                            id: eventRowBg
+                            required property var modelData
+                            width: dayEventList.width
+                            implicitHeight: eventRow.implicitHeight + 12
+                            radius: Appearance.rounding.small
+                            color: eventArea.containsMouse
+                                ? ColorUtils.transparentize(Appearance.colors.colLayer0, 0.6)
+                                : ColorUtils.transparentize(Appearance.colors.colLayer0, 0.8)
+                            Behavior on color {
+                                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                            }
+
+                            RowLayout {
+                                id: eventRow
+                                anchors {
+                                    left: parent.left; right: parent.right
+                                    verticalCenter: parent.verticalCenter
+                                    leftMargin: 8; rightMargin: 8
+                                }
+                                spacing: 8
+
+                                // Barrita del color de su calendario, como en el sidebar
+                                Rectangle {
+                                    Layout.fillHeight: true
+                                    implicitWidth: 3
+                                    radius: 1.5
+                                    color: (eventRowBg.modelData.color ?? "").length > 0
+                                        ? eventRowBg.modelData.color
+                                        : Appearance.colors.colPrimary
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 0
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: eventRowBg.modelData.summary
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        color: Appearance.colors.colOnPrimaryContainer
+                                        elide: Text.ElideRight
+                                    }
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: root.eventTimeText(eventRowBg.modelData)
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        color: Appearance.colors.colOnPrimaryContainer
+                                        opacity: 0.7
+                                        elide: Text.ElideRight
+                                    }
+                                }
+
+                                MaterialSymbol {
+                                    text: "open_in_new"
+                                    iconSize: Appearance.font.pixelSize.normal
+                                    color: Appearance.colors.colOnPrimaryContainer
+                                    opacity: eventArea.containsMouse ? 0.8 : 0
+                                    Behavior on opacity {
+                                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: eventArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Calendars.open(eventRowBg.modelData)
+                            }
+                        }
+                    }
+                }
+
+                // Pie: cuántos hay y el día completo en la web del proveedor
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: !dayFlyout.compact && root.selectedEvents.length > 0
+                    spacing: 4
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: root.selectedEvents.length === 1
+                            ? Translation.tr("1 evento")
+                            : Translation.tr("%1 eventos").arg(root.selectedEvents.length)
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colOnPrimaryContainer
+                        opacity: 0.7
+                    }
+
+                    Rectangle {
+                        implicitWidth: openDayRow.implicitWidth + 16
+                        implicitHeight: 26
+                        radius: Appearance.rounding.full
+                        color: openDayArea.containsMouse
+                            ? Appearance.colors.colPrimary
+                            : ColorUtils.transparentize(Appearance.colors.colPrimary, 0.8)
+                        Behavior on color {
+                            animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                        }
+
+                        RowLayout {
+                            id: openDayRow
+                            anchors.centerIn: parent
+                            spacing: 4
+                            MaterialSymbol {
+                                text: "open_in_new"
+                                iconSize: Appearance.font.pixelSize.small
+                                color: openDayArea.containsMouse
+                                    ? Appearance.colors.colOnPrimary
+                                    : Appearance.colors.colOnPrimaryContainer
+                            }
+                            StyledText {
+                                text: Translation.tr("Abrir día")
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: openDayArea.containsMouse
+                                    ? Appearance.colors.colOnPrimary
+                                    : Appearance.colors.colOnPrimaryContainer
+                            }
+                        }
+
+                        MouseArea {
+                            id: openDayArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Calendars.openDay(root.selectedDateKey)
                         }
                     }
                 }
@@ -528,6 +855,13 @@ AbstractBackgroundWidget {
                                         ? Appearance.colors.colOnPrimary
                                         : Appearance.colors.colPrimary
                                     opacity: modelData.currentMonth ? 1.0 : 0.3
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: Config.options.background.widgetsLocked
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: root.openDayEvents(modelData.dateKey)
                                 }
                             }
                         }
@@ -685,8 +1019,9 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
             resizeMode: "diagonal"
-            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
+            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = elastic.update(dx, dy, startWidth) }
             onResizeFinished: {
+                elastic.finish()
                 root.configEntry.sizeMode = root.sizeMode
             }
         }

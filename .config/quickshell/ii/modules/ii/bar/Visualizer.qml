@@ -23,11 +23,11 @@ Item {
     implicitWidth: vertical
         ? Appearance.sizes.verticalBarWidth
         : (isMaterial
-            ? barsRow.implicitWidth + 16
+            ? (rowLoader.item?.implicitWidth ?? 0) + 16
             : barCount * (dotSize + dotSpacing))
     implicitHeight: vertical
         ? (isMaterial
-            ? barsColumn.implicitHeight + 16
+            ? (columnLoader.item?.implicitHeight ?? 0) + 16
             : barCount * (dotSize + dotSpacing))
         : Appearance.sizes.barHeight
 
@@ -36,61 +36,68 @@ Item {
         origin.x: root.width / 2
     }
 
-    Row {
-        id: barsRow
-        visible: !root.vertical
+    // Loaders y no `visible: false`: un item invisible sigue evaluando sus
+    // bindings y corriendo sus animaciones, así que la orientación que no se ve
+    // recalculaba y animaba sus 20 barras con cada cuadro de cava.
+    Loader {
+        id: rowLoader
         anchors.centerIn: parent
-        spacing: root.dotSpacing
+        active: !root.vertical
 
-        Repeater {
-            model: root.barCount
-            Rectangle {
-                required property int index
-                width: root.dotSize
-                property real pointValue: {
-                    if (!root.isPlaying || root.points.length === 0)
-                        return root.dotSize;
-                    const idx = Math.floor(index * root.points.length / root.barCount);
-                    const v = root.points[idx] ?? 0;
-                    return Math.max(root.dotSize, (v / root.maxVisualizerValue) * root.maxBarHeight);
+        sourceComponent: Row {
+            spacing: root.dotSpacing
+
+            Repeater {
+                model: root.barCount
+                Rectangle {
+                    required property int index
+                    width: root.dotSize
+                    property real pointValue: {
+                        if (!root.isPlaying || root.points.length === 0)
+                            return root.dotSize;
+                        const idx = Math.floor(index * root.points.length / root.barCount);
+                        const v = root.points[idx] ?? 0;
+                        return Math.max(root.dotSize, (v / root.maxVisualizerValue) * root.maxBarHeight);
+                    }
+                    height: pointValue
+                    radius: width / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Appearance.colors.colPrimary
+                    opacity: root.isPlaying ? 0.85 : 0.3
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
                 }
-                height: pointValue
-                radius: width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                color: Appearance.colors.colPrimary
-                opacity: root.isPlaying ? 0.85 : 0.3
-                Behavior on height { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
-                Behavior on opacity { NumberAnimation { duration: 300 } }
             }
         }
     }
 
-    Column {
-        id: barsColumn
-        visible: root.vertical
+    Loader {
+        id: columnLoader
         anchors.centerIn: parent
-        spacing: root.dotSpacing
+        active: root.vertical
 
-        Repeater {
-            model: root.barCount
-            Rectangle {
-                required property int index
-                height: root.dotSize
-                property real pointValue: {
-                    if (!root.isPlaying || root.points.length === 0)
-                        return root.dotSize;
-                    const rawIndex = root.mirrored ? (root.barCount - 1 - index) : index;
-                    const idx = Math.floor(rawIndex * root.points.length / root.barCount);
-                    const v = root.points[idx] ?? 0;
-                    return Math.max(root.dotSize, (v / root.maxVisualizerValue) * root.maxBarHeight);
+        sourceComponent: Column {
+            spacing: root.dotSpacing
+
+            Repeater {
+                model: root.barCount
+                Rectangle {
+                    required property int index
+                    height: root.dotSize
+                    property real pointValue: {
+                        if (!root.isPlaying || root.points.length === 0)
+                            return root.dotSize;
+                        const rawIndex = root.mirrored ? (root.barCount - 1 - index) : index;
+                        const idx = Math.floor(rawIndex * root.points.length / root.barCount);
+                        const v = root.points[idx] ?? 0;
+                        return Math.max(root.dotSize, (v / root.maxVisualizerValue) * root.maxBarHeight);
+                    }
+                    width: pointValue
+                    radius: height / 2
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    color: Appearance.colors.colPrimary
+                    opacity: root.isPlaying ? 0.85 : 0.3
+                    Behavior on opacity { NumberAnimation { duration: 300 } }
                 }
-                width: pointValue
-                radius: height / 2
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: Appearance.colors.colPrimary
-                opacity: root.isPlaying ? 0.85 : 0.3
-                Behavior on width { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
-                Behavior on opacity { NumberAnimation { duration: 300 } }
             }
         }
     }

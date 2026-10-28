@@ -60,9 +60,16 @@ Singleton {
     // activado. Como respaldo, tomamos también un inhibidor de logind que
     // bloquea el suspend directamente a nivel systemd, sin depender del
     // protocolo wayland ni de si Hyprland reconoce esta superficie.
+    //
+    // El --what incluye 'idle' ademas de 'sleep' a proposito: con solo
+    // 'sleep' se bloquea la suspension, pero hypridle sigue corriendo sus
+    // listeners y el equipo igual se bloqueaba a los 5 min y apagaba la
+    // pantalla (dpms) a los 10. hypridle lee la propiedad BlockInhibited
+    // de logind (general:ignore_systemd_inhibit = false por defecto), asi
+    // que con 'idle' pausa TODOS sus timeouts: lock, dpms y suspend.
     Process {
         id: sleepInhibitProc
         running: root.inhibit
-        command: ["systemd-inhibit", "--what=sleep", "--mode=block", "--who=quickshell", "--why=Manual keep-awake toggle", "sleep", "infinity"]
+        command: ["systemd-inhibit", "--what=idle:sleep", "--mode=block", "--who=quickshell", "--why=Manual keep-awake toggle", "sleep", "infinity"]
     }
 }

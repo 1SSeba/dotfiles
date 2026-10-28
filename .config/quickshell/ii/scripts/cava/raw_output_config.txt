@@ -1,6 +1,9 @@
 [general]
 mode = waves
-framerate = 60
+# 30 en vez de 60: cada cuadro de cava dispara un parseo en JS y una cascada de
+# bindings por CADA barra del visualizer (~160 en 1080p). A 60 fps eso solo se
+# comía ~20% de un core con la shell quieta; a 30 se ve igual y cuesta la mitad.
+framerate = 30
 autosens = 1
 bars = 50
 

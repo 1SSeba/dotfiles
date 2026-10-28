@@ -60,14 +60,46 @@ Scope { // Scope
         else root.pin = !root.pin;
     }
 
-    Component.onCompleted: {
+    /**
+     * Arma el contenido del sidebar si todavía no existe y lo mete en la
+     * ventana que corresponda.
+     *
+     * No se hace en `Component.onCompleted` porque eso lo construía durante el
+     * arranque de la shell, aunque nunca abrieras el sidebar: la barra tardaba
+     * más en aparecer por una pestaña de chat que quizá no ibas a mirar. Se
+     * construye al primer `open`, y si no abriste ninguno, igual se precarga
+     * unos segundos después del arranque (con todo ya quieto) para que la
+     * primera apertura no tenga que instanciar nada.
+     */
+    function ensureContent() {
+        if (root.sidebarContent) return;
         root.sidebarContent = contentComponent.createObject(null, {
             "scopeRoot": root,
         });
-        sidebarLoader.item.contentParent.children = [root.sidebarContent];
+        const host = root.detach ? detachedSidebarLoader.item : sidebarLoader.item;
+        if (host) host.contentParent.children = [root.sidebarContent];
+    }
+
+    Connections {
+        target: GlobalStates
+        function onSidebarLeftOpenChanged() {
+            if (GlobalStates.sidebarLeftOpen) root.ensureContent();
+        }
+    }
+
+    Timer {
+        interval: 8000
+        running: true
+        repeat: false
+        onTriggered: root.ensureContent()
+    }
+
+    Component.onCompleted: {
+        if (GlobalStates.sidebarLeftOpen) root.ensureContent();
     }
 
     onDetachChanged: {
+        root.ensureContent();
         if (root.detach) {
             GlobalFocusGrab.removeDismissable(sidebarLoader.item) // Remove sidebar from the focus grab system
             sidebarContent.parent = null; // Detach content from sidebar
@@ -85,7 +117,10 @@ Scope { // Scope
     Loader {
         id: sidebarLoader
         active: true
-        
+        // Red de seguridad: si el contenido nació antes que la ventana (o
+        // volvemos de estar desprendidos), lo re-adoptamos al cargar.
+        onLoaded: if (root.sidebarContent && !root.detach) item.contentParent.children = [root.sidebarContent]
+
         sourceComponent: PanelWindow { // Window
             id: panelWindow
             visible: GlobalStates.sidebarLeftOpen
@@ -346,6 +381,11 @@ Scope { // Scope
 
         function toggle(): void {
             GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen
+        }
+
+        /** Abre/cierra el panel de historial incrustado (para atarlo a una tecla). */
+        function toggleHistory(): void {
+            GlobalStates.aiHistoryOpen = !GlobalStates.aiHistoryOpen
         }
 
         function close(): void {

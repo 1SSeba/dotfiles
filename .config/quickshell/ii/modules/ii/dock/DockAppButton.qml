@@ -15,7 +15,10 @@ DockButton {
     property real iconSize: 35
     property real countDotWidth: 10
     property real countDotHeight: 4
-    property bool appIsActive: appToplevel.toplevels.find(t => (t.activated == true)) !== undefined
+    // `t?.` y no `t.`: mientras una ventana se está cerrando, la lista puede
+    // traer un toplevel ya destruido (null) y el binding tiraba
+    // "TypeError: Cannot read property 'activated' of null" en el log.
+    property bool appIsActive: appToplevel.toplevels.find(t => (t?.activated === true)) !== undefined
 
     readonly property bool isSeparator: appToplevel.appId === "SEPARATOR"
     property var desktopEntry: DesktopEntries.heuristicLookup(appToplevel.appId)

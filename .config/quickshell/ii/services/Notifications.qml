@@ -64,11 +64,15 @@ Singleton {
         interval: 7000
         running: true
         onTriggered: () => {
-            const index = root.list.findIndex((notif) => notif.notificationId === notificationId);
+            const index = root.list.findIndex((notif) => notif?.notificationId === notificationId);
             const notifObject = root.list[index];
             print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
-            if (notifObject.isTransient) root.discardNotification(notificationId);
-            else root.timeoutNotification(notificationId);
+            // `notifObject?.` y no `notifObject.`: si la notificación ya se
+            // cerró a mano antes de que venciera el timer, esto tiraba
+            // "TypeError: Cannot read property 'isTransient' of undefined" y
+            // cortaba el handler ANTES del destroy(), dejando el Timer colgado.
+            if (notifObject?.isTransient) root.discardNotification(notificationId);
+            else if (notifObject) root.timeoutNotification(notificationId);
             destroy()
         }
     }
@@ -77,7 +81,7 @@ Singleton {
     property int unread: 0
     property var filePath: Directories.notificationsPath
     property list<Notif> list: []
-    property var popupList: list.filter((notif) => notif.popup);
+    property var popupList: list.filter((notif) => notif?.popup ?? false);
     property bool popupInhibited: (GlobalStates?.sidebarRightOpen ?? false) || silent
     property var latestTimeForApp: ({})
     Component {
@@ -90,19 +94,20 @@ Singleton {
     }
 
     function stringifyList(list) {
-        return JSON.stringify(list.map((notif) => notifToJSON(notif)), null, 2);
+        return JSON.stringify(list.filter((notif) => notif).map((notif) => notifToJSON(notif)), null, 2);
     }
     
     onListChanged: {
         // Update latest time for each app
         root.list.forEach((notif) => {
+            if (!notif) return;
             if (!root.latestTimeForApp[notif.appName] || notif.time > root.latestTimeForApp[notif.appName]) {
                 root.latestTimeForApp[notif.appName] = Math.max(root.latestTimeForApp[notif.appName] || 0, notif.time);
             }
         });
         // Remove apps that no longer have notifications
         Object.keys(root.latestTimeForApp).forEach((appName) => {
-            if (!root.list.some((notif) => notif.appName === appName)) {
+            if (!root.list.some((notif) => notif?.appName === appName)) {
                 delete root.latestTimeForApp[appName];
             }
         });
@@ -118,6 +123,7 @@ Singleton {
     function groupsForList(list) {
         const groups = {};
         list.forEach((notif) => {
+            if (!notif) return;
             if (!groups[notif.appName]) {
                 groups[notif.appName] = {
                     appName: notif.appName,
@@ -191,7 +197,7 @@ Singleton {
 
     function discardNotification(id) {
         console.log("[Notifications] Discarding notification with ID: " + id);
-        const index = root.list.findIndex((notif) => notif.notificationId === id);
+        const index = root.list.findIndex((notif) => notif?.notificationId === id);
         const notifServerIndex = notifServer.trackedNotifications.values.findIndex((notif) => notif.id + root.idOffset === id);
         if (index !== -1) {
             root.list.splice(index, 1);
@@ -215,13 +221,16 @@ Singleton {
     }
 
     function cancelTimeout(id) {
-        const index = root.list.findIndex((notif) => notif.notificationId === id);
+        const index = root.list.findIndex((notif) => notif?.notificationId === id);
+        // `timer?.` : una notificación que llegó con los popups inhibidos
+        // (sidebar derecho abierto, modo silencio) nunca tuvo Timer, y esto
+        // tiraba "Cannot read property 'stop' of null" al pasarle el mouse.
         if (root.list[index] != null)
-            root.list[index].timer.stop();
+            root.list[index].timer?.stop();
     }
 
     function timeoutNotification(id) {
-        const index = root.list.findIndex((notif) => notif.notificationId === id);
+        const index = root.list.findIndex((notif) => notif?.notificationId === id);
         if (root.list[index] != null)
             root.list[index].popup = false;
         root.timeout(id);

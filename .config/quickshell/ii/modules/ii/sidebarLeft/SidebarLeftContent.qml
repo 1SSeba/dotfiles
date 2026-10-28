@@ -30,6 +30,37 @@ Item {
     ]
     property int tabCount: swipeView.count
 
+    /**
+     * Componentes de cada pestaña, EN EL MISMO ORDEN que `tabButtonList`.
+     *
+     * Antes esto era `contentChildren: [aiChat.createObject(), ...]`: se
+     * instanciaban las seis pestañas juntas al nacer el sidebar (o sea, al
+     * arrancar la shell), aunque no abrieras ninguna. Eso significaba tener
+     * viva, todo el tiempo, la grilla de Booru, el cliente de Spotify, el de
+     * Matrix y — la peor — la webview de Social, que es un Chromium entero.
+     * Además, si cambiaba cualquiera de los `*Enabled` la lista se reevaluaba y
+     * volvía a llamar `createObject()` para TODAS, dejando huérfanas las de
+     * antes.
+     *
+     * Ahora cada pestaña vive en un Loader que se activa la primera vez que la
+     * mirás y queda viva de ahí en más (no se descarga al cambiar de pestaña:
+     * perder el chat a medio escribir sería peor que la memoria que ahorra).
+     */
+    readonly property var tabComponents: {
+        const list = [];
+        if (root.aiChatEnabled) list.push(aiChat);
+        if (root.translatorEnabled) list.push(translator);
+        if (root.inspoEnabled) list.push(inspo);
+        if (root.musicEnabled) list.push(music);
+        if (root.socialEnabled) list.push(social);
+        if (root.tabButtonList.length === 0
+            || (!root.aiChatEnabled && !root.translatorEnabled && !root.inspoEnabled
+                && !root.musicEnabled && !root.socialEnabled && root.animeCloset))
+            list.push(placeholder);
+        if (root.animeEnabled) list.push(anime);
+        return list;
+    }
+
     function focusActiveItem() {
         swipeView.currentItem.forceActiveFocus()
     }
@@ -80,9 +111,17 @@ Item {
                 id: tabBar
                 Layout.alignment: Qt.AlignHCenter
                 tabButtonList: root.tabButtonList
-                currentIndex: swipeView.currentIndex
                 // Lo que queda del panel descontando su margen y el del Toolbar
                 availableWidth: root.width - root.sidebarPadding * 2 - 8 * 2
+
+                // Sincronización explícita con el SwipeView, en los dos sentidos
+                // y con guarda de igualdad. Antes eran DOS bindings cruzadas
+                // (`tabBar.currentIndex: swipeView.currentIndex` y
+                // `swipeView.currentIndex: tabBar.currentIndex`): cualquier
+                // asignación imperativa —arrastrar el SwipeView, o el
+                // Ctrl+AvPág de más arriba— rompía una de las dos y a partir de
+                // ahí la barra y el contenido quedaban desincronizados.
+                onCurrentIndexChanged: if (swipeView.currentIndex !== tabBar.currentIndex) swipeView.setCurrentIndex(tabBar.currentIndex)
             }
         }
 
@@ -98,7 +137,8 @@ Item {
                 id: swipeView
                 anchors.fill: parent
                 spacing: 10
-                currentIndex: tabBar.currentIndex
+
+                onCurrentIndexChanged: if (tabBar.currentIndex !== swipeView.currentIndex) tabBar.setCurrentIndex(swipeView.currentIndex)
 
                 clip: true
                 layer.enabled: true
@@ -110,15 +150,23 @@ Item {
                     }
                 }
 
-                contentChildren: [
-                    ...(root.aiChatEnabled ? [aiChat.createObject()] : []),
-                    ...(root.translatorEnabled ? [translator.createObject()] : []),
-                    ...(root.inspoEnabled ? [inspo.createObject()] : []),
-                    ...(root.musicEnabled ? [music.createObject()] : []),
-                    ...(root.socialEnabled ? [social.createObject()] : []),
-                    ...((root.tabButtonList.length === 0 || (!root.aiChatEnabled && !root.translatorEnabled && !root.inspoEnabled && !root.musicEnabled && !root.socialEnabled && root.animeCloset)) ? [placeholder.createObject()] : []),
-                    ...(root.animeEnabled ? [anime.createObject()] : []),
-                ]
+                Repeater {
+                    model: root.tabComponents
+
+                    delegate: Loader {
+                        id: pageLoader
+                        required property var modelData
+                        /** Ya se abrió alguna vez: se instancia y no se vuelve a descargar. */
+                        property bool everShown: false
+                        readonly property bool isCurrent: SwipeView.isCurrentItem
+
+                        onIsCurrentChanged: if (pageLoader.isCurrent) pageLoader.everShown = true
+                        Component.onCompleted: if (pageLoader.isCurrent) pageLoader.everShown = true
+
+                        active: pageLoader.everShown
+                        sourceComponent: pageLoader.modelData
+                    }
+                }
             }
         }
 

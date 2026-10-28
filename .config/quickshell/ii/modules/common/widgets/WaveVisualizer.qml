@@ -14,6 +14,9 @@ Canvas { // Visualizer
     property color color: Appearance.m3colors.m3primary
 
     onPointsChanged: () => {
+        // Repintar una Canvas cuesta un raster en el hilo de GUI: si no se ve
+        // (popup cerrado, otra pestaña) no hay nada que dibujar.
+        if (!root.visible) return;
         root.requestPaint()
     }
 
@@ -30,8 +33,11 @@ Canvas { // Visualizer
         if (n < 2) return;
 
         // Smoothing: simple moving average (optional)
+        // El promedio se arma en un array de JS local y recién al final se
+        // publica en la propiedad: hacer `push` sobre un `list<var>` de QML
+        // cruza la frontera QML/JS una vez por punto y por cuadro.
         var smoothWindow = root.smoothing; // adjust for more/less smoothing
-        root.smoothPoints = [];
+        var smoothed = new Array(n);
         for (var i = 0; i < n; ++i) {
             var sum = 0, count = 0;
             for (var j = -smoothWindow; j <= smoothWindow; ++j) {
@@ -39,15 +45,16 @@ Canvas { // Visualizer
                 sum += points[idx];
                 count++;
             }
-            root.smoothPoints.push(sum / count);
+            smoothed[i] = sum / count;
         }
-        if (!root.live) root.smoothPoints.fill(0); // If not playing, show no points
+        if (!root.live) smoothed.fill(0); // If not playing, show no points
+        root.smoothPoints = smoothed;
 
         ctx.beginPath();
         ctx.moveTo(0, h);
         for (var i = 0; i < n; ++i) {
             var x = i * w / (n - 1);
-            var y = h - (root.smoothPoints[i] / maxVal) * h;
+            var y = h - (smoothed[i] / maxVal) * h;
             ctx.lineTo(x, y);
         }
         ctx.lineTo(w, h);

@@ -51,6 +51,11 @@ ApplicationWindow {
             component: "modules/settings/InputConfig.qml"
         },
         {
+            name: Translation.tr("Grabación"),
+            icon: "screen_record",
+            component: "modules/settings/RecordingConfig.qml"
+        },
+        {
             name: Translation.tr("Bar"),
             icon: "toast",
             iconRotation: 180,

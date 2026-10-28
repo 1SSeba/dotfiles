@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-locked_state=$(busctl --user get-property org.freedesktop.secrets \
+locked_state=$(busctl --user --timeout=5 get-property org.freedesktop.secrets \
     /org/freedesktop/secrets/collection/login \
     org.freedesktop.Secret.Collection Locked)
 if [[ "${locked_state}" == "b false" ]]; then

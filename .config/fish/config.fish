@@ -45,3 +45,10 @@ if status is-login
     and test "$XDG_VTNR" = 1
     exec hyprland
 end
+
+# bun
+set --export BUN_INSTALL "$HOME/.bun"
+set --export PATH $BUN_INSTALL/bin $PATH
+
+# Hermes Agent command
+fish_add_path "$HOME/.local/bin"

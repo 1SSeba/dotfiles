@@ -22,7 +22,10 @@ Scope {
     readonly property real widgetWidth: Appearance.sizes.mediaControlsWidth
     readonly property real widgetHeight: Appearance.sizes.mediaControlsHeight
     property real popupRounding: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
-    property list<real> visualizerPoints: []
+    // Una sola fuente de verdad: antes se escribía la misma lista acá Y en
+    // GlobalStates, así que cada cuadro de cava disparaba DOS cascadas de
+    // bindings sobre los mismos consumidores.
+    readonly property list<real> visualizerPoints: GlobalStates.visualizerPoints
 
     function filterDuplicatePlayers(players) {
         let filtered = [];
@@ -65,16 +68,33 @@ Scope {
             && MprisController.activePlayer !== null
         onRunningChanged: {
             if (!cavaProc.running) {
-                root.visualizerPoints = [];
+                cavaProc.wasSilent = true;
                 GlobalStates.visualizerPoints = [];
             }
         }
         command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
+
+        // Con el reproductor en pausa (o en un silencio), cava sigue mandando
+        // cuadros de ceros. Publicarlos igual repintaba todo el visualizer varias
+        // decenas de veces por segundo para no mostrar nada: se publica el primer
+        // cuadro mudo (para que las barras bajen) y se ignoran los siguientes.
+        property bool wasSilent: true
+
         stdout: SplitParser {
             onRead: data => {
-                // Parse `;`-separated values into the visualizerPoints array
-                let points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
-                root.visualizerPoints = points;
+                // Parse `;`-separated values into the visualizerPoints array.
+                // Sin map/filter intermedios: esto corre por cada cuadro de cava.
+                const raw = data.split(";");
+                const points = [];
+                let silent = true;
+                for (let i = 0; i < raw.length; i++) {
+                    const value = parseFloat(raw[i]);
+                    if (isNaN(value)) continue;
+                    if (value > 0) silent = false;
+                    points.push(value);
+                }
+                if (silent && cavaProc.wasSilent) return;
+                cavaProc.wasSilent = silent;
                 GlobalStates.visualizerPoints = points;
             }
         }

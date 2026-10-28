@@ -25,37 +25,21 @@ AbstractBackgroundWidget {
 
     property string sizeMode: root.configEntry.sizeMode ?? "2x2"
 
-    property real widgetWidth: {
-        switch (root.sizeMode) {
-            case "1x1": return snapWidth1
-            case "1x2": return snapWidth2
-            default:    return snapWidth3
-        }
-    }
-    property real widgetHeight: {
-        switch (root.sizeMode) {
-            case "1x1": return snapHeight1
-            case "1x2": return snapHeight2
-            default:    return snapHeight3
-        }
+    // Estirar como las notas: la tarjeta sigue al mouse y el contenido pasa
+    // al modo más cercano (ver ElasticResize).
+    ElasticResize {
+        id: elastic
+        widget: root
+        mode: root.sizeMode
+        modes: [
+            { "mode": "1x1", "width": root.snapWidth1, "height": root.snapHeight1 },
+            { "mode": "1x2", "width": root.snapWidth2, "height": root.snapHeight2 },
+            { "mode": "2x2", "width": root.snapWidth3, "height": root.snapHeight3 }
+        ]
     }
 
-    readonly property real heightToggleFraction: 0.3
-    readonly property real heightToggleDelta: (root.snapHeight3 - root.snapHeight2) * root.heightToggleFraction
-
-    function modeForDrag(dx, dy, startWidth) {
-        var mid = (root.snapWidth1 + root.snapWidth2) / 2
-        var newWidth = startWidth + dx
-
-        if (newWidth < mid) return "1x1"
-
-        if (root.sizeMode === "1x1") {
-            return dy > root.heightToggleDelta ? "2x2" : "1x2"
-        }
-        if (dy > root.heightToggleDelta) return "2x2"
-        if (dy < -root.heightToggleDelta) return "1x2"
-        return root.sizeMode
-    }
+    property real widgetWidth: elastic.resizing ? elastic.dragWidth : elastic.current.width
+    property real widgetHeight: elastic.resizing ? elastic.dragHeight : elastic.current.height
 
     property int avatarSize: 64
     property int blurMargin: 18
@@ -103,10 +87,13 @@ AbstractBackgroundWidget {
     implicitWidth: root.widgetWidth
     implicitHeight: root.widgetHeight
 
+    // Siguiendo al mouse, sin animar; al soltar, se acomoda al tamaño del modo.
     Behavior on widgetWidth {
+        enabled: !elastic.resizing
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
     Behavior on widgetHeight {
+        enabled: !elastic.resizing
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
 
@@ -128,8 +115,9 @@ AbstractBackgroundWidget {
         implicitWidth: root.widgetWidth
         implicitHeight: root.widgetHeight
 
-        Loader {
-            anchors.fill: parent
+        ModeLoader {
+            naturalWidth: elastic.current.width
+            naturalHeight: elastic.current.height
             sourceComponent: {
                 if (root.sizeMode === "1x1") return oneByOneContent
                 if (root.sizeMode === "1x2") return oneByTwoContent
@@ -538,8 +526,9 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
             resizeMode: "diagonal"
-            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
+            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = elastic.update(dx, dy, startWidth) }
             onResizeFinished: {
+                elastic.finish()
                 root.configEntry.sizeMode = root.sizeMode
             }
         }

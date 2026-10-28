@@ -14,6 +14,23 @@ Canvas {
     signal resizedXY(real dx, real dy, real startWidth)
     signal resizeFinished()
 
+    /** El WidgetCanvas de arriba, si hay: el que dibuja la grilla. */
+    function findCanvas() {
+        let p = root.parent
+        while (p) {
+            if (p.isWidgetCanvas === true) return p
+            p = p.parent
+        }
+        return null
+    }
+
+    // Mientras se estira, la misma grilla que al mover el widget, para
+    // alinearlo a ojo (y a los widgets que lo enganchan, a la grilla).
+    function setGridShown(shown) {
+        const canvas = root.findCanvas()
+        if (canvas) canvas.setDragging(shown)
+    }
+
     width: 62
     height: 62
     anchors {
@@ -61,6 +78,7 @@ Canvas {
             var globalPos = mapToItem(null, mouse.x, mouse.y)
             startX = globalPos.x
             startY = globalPos.y
+            root.setGridShown(true)
         }
         onPositionChanged: (mouse) => {
             if (!pressed) return
@@ -74,7 +92,10 @@ Canvas {
             root.resizedXY(dx, dy, startValue)
         }
         onReleased: {
+            root.setGridShown(false)
             root.resizeFinished()
         }
+        // Si se pierde el mouse a mitad de camino, que la grilla no quede puesta
+        onCanceled: root.setGridShown(false)
     }
 }

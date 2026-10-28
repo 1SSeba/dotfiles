@@ -61,34 +61,27 @@ AbstractBackgroundWidget {
 
     property string sizeMode: root.configEntry.sizeMode ?? "1x3"
 
-    property real widgetWidth: {
-        switch (root.sizeMode) {
-            case "1x1": return root.snapWidth1
-            case "1x2": return root.snapWidth2
-            case "2x3": return root.snapWidth3
-            default:    return root.snapWidth3
-        }
+    // Estirar como las notas: la tarjeta sigue al mouse y el contenido pasa
+    // al modo más cercano (ver ElasticResize).
+    ElasticResize {
+        id: elastic
+        widget: root
+        mode: root.sizeMode
+        modes: [
+            { "mode": "1x1", "width": root.snapWidth1, "height": root.cardHeight },
+            { "mode": "1x2", "width": root.snapWidth2, "height": root.cardHeight },
+            // Con la letra abierta, el 1x3 es más alto: que el estirado arranque
+            // desde el alto que se ve, no desde el de la tarjeta cerrada.
+            { "mode": "1x3", "width": root.snapWidth3, "height": root.cardHeight + (root.showLyrics ? 264 : 0) },
+            { "mode": "2x3", "width": root.snapWidth3, "height": root.doubleCardHeight }
+        ]
     }
 
-    function modeForWidth(value) {
-        var mid1 = (root.snapWidth1 + root.snapWidth2) / 2
-        var mid2 = (root.snapWidth2 + root.snapWidth3) / 2
-        if (value < mid1) return "1x1"
-        if (value < mid2) return "1x2"
-        return "1x3"
-    }
+    property real widgetWidth: elastic.resizing ? elastic.dragWidth : elastic.current.width
 
-    readonly property real heightEnterFraction: 0.2
-    readonly property real heightEnterDelta: (root.doubleCardHeight - root.cardHeight) * root.heightEnterFraction
-
-    function modeForDrag(dx, dy, startWidth) {
-        if (root.sizeMode === "1x3" && dy > root.heightEnterDelta) {
-            return "2x3"
-        }
-        return root.modeForWidth(startWidth + dx)
-    }
-
+    // Siguiendo al mouse, sin animar; al soltar, se acomoda al tamaño del modo.
     Behavior on widgetWidth {
+        enabled: !elastic.resizing
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
 
@@ -137,19 +130,19 @@ AbstractBackgroundWidget {
     Rectangle {
         id: card
         implicitWidth: root.widgetWidth
-        implicitHeight: root.sizeMode === "2x3"
-            ? root.doubleCardHeight
-            : (root.cardHeight + (root.sizeMode === "1x3" && root.showLyrics ? 264 : 0))
+        implicitHeight: elastic.resizing ? elastic.dragHeight : elastic.current.height
         radius: Appearance.rounding?.verylarge ?? 30
         color: Appearance.colors.colPrimaryContainer
         clip: true
 
         Behavior on implicitHeight {
-            NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            enabled: !elastic.resizing
+            animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
-        Loader {
-            anchors.fill: parent
+        ModeLoader {
+            naturalWidth: elastic.current.width
+            naturalHeight: elastic.current.height
             sourceComponent: {
                 if (root.sizeMode === "1x1") return oneByOneContent
                 if (root.sizeMode === "1x2") return oneByTwoContent
@@ -765,8 +758,11 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
             resizeMode: "diagonal"
-            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
-            onResizeFinished: { root.configEntry.sizeMode = root.sizeMode }
+            onResizedXY: (dx, dy, startWidth) => { root.sizeMode = elastic.update(dx, dy, startWidth) }
+            onResizeFinished: {
+                elastic.finish()
+                root.configEntry.sizeMode = root.sizeMode
+            }
         }
     }
 }

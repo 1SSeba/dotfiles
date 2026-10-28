@@ -12,6 +12,8 @@ Singleton {
         { identifier: "fpsLimiter", materialSymbol: "animation" },
         { identifier: "floatingImage", materialSymbol: "imagesmode" },
         { identifier: "recorder", materialSymbol: "screen_record" },
+        { identifier: "recordingIndicator", materialSymbol: "fiber_manual_record" },
+        { identifier: "sceneEditor", materialSymbol: "video_stable" },
         { identifier: "resources", materialSymbol: "browse_activity" },
         { identifier: "notes", materialSymbol: "note_stack" },
         { identifier: "volumeMixer", materialSymbol: "volume_up" },

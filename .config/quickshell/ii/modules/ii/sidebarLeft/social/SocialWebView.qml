@@ -14,17 +14,20 @@ import QtWebEngine
  * Social.qml solo lo carga si QS_WEBENGINE=1, que es lo que exporta el shim.
  * Ver ~/.local/lib/qs-webengine-shim/.
  *
- * Cada red se lleva su propio perfil persistente, así que la sesión sobrevive a
- * los reinicios (WhatsApp no te hace escanear el QR de nuevo) y las cuentas no
- * se pisan entre sí.
+ * Cada red se lleva su propio perfil, nombrado de forma estable y guardado en
+ * disco bajo ~/.local/state/quickshell/user/social/<perfil>, para que las cuentas
+ * no se pisen entre sí. Si `persistCookies` está prendido la sesión sobrevive a
+ * los reinicios (WhatsApp no te hace escanear el QR de nuevo); si no, las cookies
+ * quedan en memoria nomás y se pierden al cerrar la shell.
  */
 Item {
     id: root
     // required: así el Loader las inyecta ANTES de que se evalúen las bindings,
-    // y el perfil nace ya con su storageName en vez de arrancar off-the-record y
-    // migrar a disco a mitad de camino.
+    // y el perfil nace ya con su storageName/policy en vez de arrancar con uno
+    // y migrar a mitad de camino.
     required property string startUrl
     required property string storageName
+    required property bool persistCookies
 
     WebEngineView {
         id: view
@@ -36,7 +39,19 @@ Item {
         // clásico. Tira un warning de deprecación y nada más.
         profile: WebEngineProfile {
             storageName: root.storageName
-            persistentCookiesPolicy: WebEngineProfile.ForcePersistentCookies
+            // Explícito: un perfil off-the-record ignora la política de cookies
+            // y el storage path (todo vive en RAM y se va con la shell), así que
+            // no lo dejamos librado al default de Qt.
+            offTheRecord: false
+            // Un path propio por red bajo ~/.local/state/quickshell/user/social.
+            // El default (AppDataLocation + storageName) cuelga del nombre de app
+            // con el que arrancó Quickshell, así que se movía de lugar solo.
+            persistentStoragePath: `${Directories.socialProfiles}/${root.storageName}`
+            cachePath: `${Directories.socialProfilesCache}/${root.storageName}`
+            httpCacheType: WebEngineProfile.DiskHttpCache
+            persistentCookiesPolicy: root.persistCookies
+                ? WebEngineProfile.ForcePersistentCookies
+                : WebEngineProfile.NoPersistentCookies
         }
 
         Component.onCompleted: {

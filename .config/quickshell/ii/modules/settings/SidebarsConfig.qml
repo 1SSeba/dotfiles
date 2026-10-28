@@ -791,6 +791,19 @@ ContentPage {
             }
         }
 
+        ConfigSwitch {
+            buttonIcon: "cookie"
+            text: Translation.tr("Guardar sesión de los links (cookies)")
+            enabled: Config.options.sidebar.social.enable
+            checked: Config.options.sidebar.social.persistCookies
+            onCheckedChanged: {
+                Config.options.sidebar.social.persistCookies = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Prendido: WhatsApp y compañía no piden loguearse de nuevo\ndespués de reiniciar. Apagado: no queda nada en disco,\nasí que cada pestaña arranca deslogueada.")
+            }
+        }
+
         ContentSubsection {
             title: Translation.tr("Matrix")
             tooltip: Translation.tr("Matrix es el pegamento para meter otras redes acá adentro:\nlos puentes (mautrix-whatsapp y compañía) publican cada chat como\nuna sala, así que la shell no necesita saber nada de WhatsApp en particular.")

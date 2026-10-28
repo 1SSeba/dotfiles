@@ -19,7 +19,12 @@ Scope {
     
     Loader {
         id: overlayLoader
-        active: GlobalStates.overlayOpen || OverlayContext.hasPinnedWidgets
+        // El indicador de grabación necesita existir apenas arranca una
+        // grabación, sin que el usuario haya abierto el overlay ni una vez
+        // en esta sesión (si nunca se abrió, OverlayContext.hasPinnedWidgets
+        // nunca llegó a poblarse porque ningún widget tuvo la chance de
+        // registrarse en su Component.onCompleted).
+        active: GlobalStates.overlayOpen || OverlayContext.hasPinnedWidgets || Persistent.states.record.enable
         sourceComponent: PanelWindow {
             id: overlayWindow
             exclusionMode: ExclusionMode.Ignore

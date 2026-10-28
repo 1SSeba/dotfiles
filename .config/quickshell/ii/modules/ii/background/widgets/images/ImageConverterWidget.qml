@@ -14,6 +14,9 @@ AbstractBackgroundWidget {
     id: root
 
     configEntryName: "images"
+    // Se agranda y achica entero con la manija (ver AbstractBackgroundWidget)
+    scalable: true
+    hoverEnabled: true
 
     property list<var> formatOptions: [
         { displayName: "PNG",  icon: "image",            value: "png"  },

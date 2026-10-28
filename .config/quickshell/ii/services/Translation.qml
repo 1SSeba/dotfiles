@@ -121,6 +121,11 @@ Singleton {
         property string languageCode: root.languageCode
         signal contentLoaded(var data)
 
+        // El directorio de traducciones generadas es opcional: que no exista es
+        // lo normal, no un error. `onLoadFailed` ya devuelve {} — sin esto,
+        // además, cada arranque y cada cambio de idioma dejaba un WARN en el log.
+        printErrors: false
+
         function reread() { // Proper reload in case the file was incorrect before
             translationReader.path = "";
             translationReader.path = `${translationReader.translationsDir}/${translationReader.languageCode}.json`;

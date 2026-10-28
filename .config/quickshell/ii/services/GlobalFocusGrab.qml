@@ -52,12 +52,27 @@ Singleton {
         }
     }
 
+    /**
+     * ¿Hay algo con foco de teclado dentro de este item?
+     *
+     * Iterativo y con guarda de nulo a propósito: esto lo llama el binding de
+     * `windows`, que se re-evalúa cada vez que cambia la lista de hijos de
+     * CUALQUIER item del árbol (una lista que crea delegates al hacer scroll,
+     * por ejemplo). Con `Array.from(element?.children)` alcanzaba con que un
+     * item se estuviera destruyendo justo en ese momento para tirar un
+     * TypeError, dejar el binding sin resultado y soltar el grab de foco.
+     */
     function hasActive(element) {
-        return element?.activeFocus || Array.from(
-            element?.children
-        ).some(
-            (child) => hasActive(child)
-        );
+        const pending = [element];
+        while (pending.length > 0) {
+            const item = pending.pop();
+            if (!item) continue;
+            if (item.activeFocus) return true;
+            const children = item.children;
+            if (!children) continue;
+            for (let i = 0; i < children.length; i++) pending.push(children[i]);
+        }
+        return false;
     }
 
     HyprlandFocusGrab {

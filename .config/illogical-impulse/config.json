@@ -187,10 +187,10 @@
         "volumeStep": 2
     },
     "background": {
-        "centeredWallpaper": true,
-        "centeredWallpaperColor": "primaryContainer",
-        "centeredWallpaperOnlyWhenLocked": true,
-        "centeredWallpaperShape": "Cookie12Sided",
+        "centeredWallpaper": false,
+        "centeredWallpaperColor": "tertiaryContainer",
+        "centeredWallpaperOnlyWhenLocked": false,
+        "centeredWallpaperShape": "Pill",
         "centeredWallpaperSize": 800,
         "enableWallpaperPreview": false,
         "hideWhenFullscreen": true,
@@ -211,7 +211,7 @@
         "thumbnailPath": "",
         "wallpaperAnimation": "random",
         "wallpaperAnimationDuration": 1200,
-        "wallpaperPath": "/home/scruzd/Pictures/Inspo/wallhaven-yq9rwx.png",
+        "wallpaperPath": "/home/scruzd/Pictures/Inspo/wallhaven-d8vvlo.png",
         "widgets": {
             "calendar": {
                 "enable": true,
@@ -262,6 +262,7 @@
                     "followClock": false,
                     "text": ""
                 },
+                "scale": 1,
                 "screenList": [
                 ],
                 "showOnlyWhenLocked": false,
@@ -279,13 +280,14 @@
                 ],
                 "shape": "Cookie4Sided",
                 "size": 200,
-                "x": 600,
-                "y": 228
+                "x": 828,
+                "y": 204
             },
             "enableShadows": true,
             "images": {
                 "enable": true,
                 "placementStrategy": "free",
+                "scale": 1,
                 "screenList": [
                     "DP-1"
                 ],
@@ -308,17 +310,22 @@
             },
             "notes": {
                 "enable": true,
+                "height": 252,
                 "placementStrategy": "free",
                 "screenList": [
                     "DP-1"
                 ],
                 "sizeMode": "2x2",
+                "vaultPath": "/mnt/raid/Obsidian/Notas Escritorio",
+                "view": "all",
+                "width": 276,
                 "x": 36,
-                "y": 456
+                "y": 468
             },
             "resources": {
                 "enable": true,
                 "placementStrategy": "free",
+                "scale": 1,
                 "screenList": [
                     "DP-1"
                 ],
@@ -338,9 +345,11 @@
             },
             "visualizer": {
                 "enable": true,
+                "height": 220,
                 "placementStrategy": "free",
                 "screenList": [
-                    "HDMI-A-1"
+                    "HDMI-A-1",
+                    "DP-1"
                 ],
                 "x": 0,
                 "y": 840
@@ -348,17 +357,19 @@
             "weather": {
                 "enable": false,
                 "placementStrategy": "free",
+                "scale": 1,
                 "screenList": [
                     "DP-1"
                 ],
                 "sizeMode": "1x1",
-                "x": 1720,
-                "y": 648
+                "x": 1008,
+                "y": 456
             },
             "worldClock": {
                 "enable": false,
                 "placementStrategy": "free",
                 "screenList": [
+                    "DP-1"
                 ],
                 "sizeMode": "2x2",
                 "timezones": [
@@ -367,11 +378,11 @@
                     "Europe/Madrid",
                     "America/New_York"
                 ],
-                "x": 400,
-                "y": 100
+                "x": 780,
+                "y": 480
             }
         },
-        "widgetsLocked": false
+        "widgetsLocked": true
     },
     "bar": {
         "autoHide": {
@@ -409,8 +420,6 @@
                 "workspaces"
             ],
             "middleLayout": [
-                "launcherButton",
-                "docktoPanel"
             ],
             "rightLayout": [
                 "clockWidget",
@@ -526,11 +535,16 @@
         "autoKillTrays": true
     },
     "crosshair": {
-        "code": "0;P;d;1;0l;10;0o;2;1b;0"
+        "code": "0;P;h;0;0l;3;0o;1;0f;0;1b;0"
     },
     "custom": {
         "colorizeIcon": true,
         "distroIcon": ""
+    },
+    "customModesByMonitor": {
+        "DP-1": [
+            "1440x1080@165.00Hz"
+        ]
     },
     "desktopMenu": {
         "enable": true
@@ -545,17 +559,19 @@
         "monochromeIcons": true,
         "pinnedApps": [
             "org.kde.dolphin",
-            "microsoft-edge",
             "spotify",
             "discord",
             "steam",
-            "kitty"
+            "kitty",
+            "md.obsidian.obsidian",
+            "code",
+            "microsoft-edge"
         ],
         "pinnedOnStartup": false,
         "showAppsButton": false,
         "showBackground": true,
         "showMedia": true,
-        "showPinButton": false
+        "showPinButton": true
     },
     "dropShelf": {
         "enable": true,
@@ -613,7 +629,7 @@
                 "accelProfile": "flat",
                 "leftHanded": false,
                 "naturalScroll": false,
-                "sensitivity": -0.51
+                "sensitivity": 0
             },
             "numlock": true,
             "repeatDelay": 250,
@@ -660,8 +676,8 @@
         "minBrightness": 0.15,
         "minGamma": 50,
         "night": {
-            "automatic": true,
-            "colorTemperature": 5335,
+            "automatic": false,
+            "colorTemperature": 4697,
             "from": "19:00",
             "to": "06:30"
         }
@@ -763,7 +779,74 @@
         "updateInterval": 3000
     },
     "screenRecord": {
-        "savePath": "/home/scruzd/Videos"
+        "activeSceneId": "test",
+        "audioSource": "",
+        "canvasHeight": 0,
+        "canvasWidth": 0,
+        "encoder": "nvenc",
+        "frameRate": 0,
+        "savePath": "/tmp/claude-1000/-home-scruzd--config-quickshell-ii/4bc0fb43-d6e6-46e1-9635-97a4964fbb8d/scratchpad",
+        "scenes": [
+            {
+                "audio": [
+                    {
+                        "id": "",
+                        "muted": false,
+                        "name": "Sistema",
+                        "type": "system",
+                        "volume": 1
+                    }
+                ],
+                "id": "test",
+                "name": "Prueba",
+                "sources": [
+                    {
+                        "address": "",
+                        "appClass": "",
+                        "appTitle": "",
+                        "device": "",
+                        "height": 1,
+                        "monitor": "",
+                        "opacity": 1,
+                        "path": "",
+                        "type": "screen",
+                        "visible": true,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    }
+                ]
+            },
+            {
+                "audio": [
+                    {
+                        "id": "",
+                        "muted": false,
+                        "name": "Audio del sistema",
+                        "type": "system",
+                        "volume": 1
+                    }
+                ],
+                "id": "scene1",
+                "name": "Escena 2",
+                "sources": [
+                    {
+                        "height": 1,
+                        "monitor": "",
+                        "opacity": 1,
+                        "type": "screen",
+                        "visible": true,
+                        "width": 1,
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    }
+                ]
+            }
+        ],
+        "showIndicator": true,
+        "x264Preset": "veryfast"
     },
     "screenSnip": {
         "savePath": ""
@@ -940,10 +1023,18 @@
                     },
                     {
                         "size": 1,
-                        "type": "idleInhibitor"
+                        "type": "darkMode"
                     },
                     {
                         "size": 2,
+                        "type": "powerProfile"
+                    },
+                    {
+                        "size": 2,
+                        "type": "idleInhibitor"
+                    },
+                    {
+                        "size": 1,
                         "type": "nightLight"
                     },
                     {
@@ -951,7 +1042,7 @@
                         "type": "mic"
                     },
                     {
-                        "size": 2,
+                        "size": 1,
                         "type": "audio"
                     },
                     {
@@ -960,44 +1051,20 @@
                     },
                     {
                         "size": 1,
-                        "type": "cloudflareWarp"
-                    },
-                    {
-                        "size": 1,
-                        "type": "screenSnip"
-                    },
-                    {
-                        "size": 1,
-                        "type": "colorPicker"
-                    },
-                    {
-                        "size": 1,
-                        "type": "musicRecognition"
-                    },
-                    {
-                        "size": 1,
                         "type": "notifications"
                     },
                     {
                         "size": 1,
-                        "type": "powerProfile"
-                    },
-                    {
-                        "size": 1,
-                        "type": "onScreenKeyboard"
+                        "type": "gameMode"
                     }
                 ]
             },
             "style": "android"
         },
         "social": {
-            "defaultView": "chats",
+            "defaultView": "links",
             "enable": true,
             "links": [
-                {
-                    "name": "WhatsApp",
-                    "url": "https://web.whatsapp.com"
-                },
                 {
                     "name": "Instagram",
                     "url": "https://www.instagram.com"
@@ -1008,9 +1075,10 @@
                 }
             ],
             "matrix": {
-                "enable": true,
+                "enable": false,
                 "homeserver": "http://localhost:8008"
-            }
+            },
+            "persistCookies": true
         },
         "translator": {
             "delay": 300,
@@ -1088,8 +1156,6 @@
         }
     },
     "wallpaperPathByMonitor": {
-        "DP-1": "/home/scruzd/Pictures/Inspo/wallhaven-1q21jw.jpg",
-        "HDMI-A-1": "/home/scruzd/Pictures/Inspo/wallhaven-lydwpr.jpg"
     },
     "wallpaperSelector": {
         "changeInterval": 0,

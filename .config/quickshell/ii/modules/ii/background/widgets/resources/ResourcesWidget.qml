@@ -11,6 +11,8 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
     configEntryName: "resources"
+    // Se agranda y achica entero con la manija (ver AbstractBackgroundWidget)
+    scalable: true
     hoverEnabled: true
 
     property real widgetWidth: 420

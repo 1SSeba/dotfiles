@@ -329,6 +329,8 @@ Singleton {
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         property real x: 100
                         property real y: 100
+                        // Tamaño (1 = el de diseño), lo cambia la manija de la esquina
+                        property real scale: 1
                         property string style: "cookie"        // Options: "cookie", "digital", "pixel"
                         // Color del reloj del fondo ("" = el del tema)
                         property string color: ""
@@ -377,6 +379,8 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "1x3"
+                        // Tamaño (1 = el de diseño), lo cambia la manija de la esquina
+                        property real scale: 1
                     }
 
                     property JsonObject calendar: JsonObject {
@@ -394,6 +398,8 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property bool vertical: false
+                        // Tamaño (1 = el de diseño), lo cambia la manija de la esquina
+                        property real scale: 1
                     }
                     property JsonObject userCard: JsonObject {
                         property bool enable: false
@@ -421,6 +427,8 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 0
                         property real y: 0
+                        // Alto máximo de las barras, lo cambia la manija de arriba
+                        property real height: 220
                     }
                     property JsonObject customImage: JsonObject {
                         property bool enable: false
@@ -438,6 +446,8 @@ Singleton {
                         property string placementStrategy: "free"
                         property real x: 400
                         property real y: 100
+                        // Tamaño (1 = el de diseño), lo cambia la manija de la esquina
+                        property real scale: 1
                     }
                     property JsonObject notes: JsonObject {
                         property bool enable: false
@@ -446,6 +456,12 @@ Singleton {
                         property real x: 400
                         property real y: 100
                         property string sizeMode: "2x2"
+                        property real width: 276
+                        property real height: 252
+                        // Vault de Obsidian donde vive cada nota como un .md
+                        property string vaultPath: "/mnt/raid/Obsidian/Notas Escritorio"
+                        // Qué se estaba mirando: "all", "pinned", "archive" o "f:<carpeta>"
+                        property string view: "all"
                     }
                     property JsonObject worldClock: JsonObject {
                         property bool enable: false
@@ -500,6 +516,14 @@ Singleton {
             // Miniatura (frame fijo) de cada wallpaper de video en wallpaperPathByMonitor,
             // misma forma que arriba pero por monitor. Mismo motivo para vivir en la raíz.
             property var thumbnailPathByMonitor: ({})
+
+            // Resoluciones custom por monitor, creadas desde Settings → Video &
+            // Pantallas: { "DP-1": ["1440x1080@165.00Hz", ...] }. Son modos que el
+            // EDID del monitor no anuncia (típico: estirar 4:3 para juegos), así que
+            // no salen en `availableModes` de hyprctl — guardarlas acá es lo que hace
+            // que sigan apareciendo en la lista de resoluciones después de crearlas.
+            // Misma razón que las dos de arriba para vivir en la raíz del adapter.
+            property var customModesByMonitor: ({})
 
             property JsonObject bar: JsonObject {
                 property JsonObject autoHide: JsonObject {
@@ -1085,6 +1109,18 @@ Singleton {
                 }
                 property JsonObject social: JsonObject {
                     property bool enable: true
+                    /**
+                     * Cada webapp de `links` guarda su sesión en un perfil propio
+                     * (ver social/SocialWebView.qml). Con esto en false esas
+                     * cookies quedan en memoria: la pestaña no te desloguea
+                     * mientras la tenés abierta, pero al cerrar el sidebar no
+                     * queda nada en disco y la próxima vez arranca de cero.
+                     *
+                     * Va en true por defecto: una webapp que te hace loguearte de
+                     * nuevo en cada reinicio de la shell no sirve para nada. Quien
+                     * no quiera dejar rastro en disco lo apaga en Settings.
+                     */
+                    property bool persistCookies: true
                     /** chats = los chats de Matrix, links = los accesos rápidos */
                     property string defaultView: "chats"
                     /**
@@ -1145,6 +1181,40 @@ Singleton {
 
             property JsonObject screenRecord: JsonObject {
                 property string savePath: Directories.videos.replace("file://","") // strip "file://"
+                property int frameRate: 0 // 0 = auto (tasa nativa del monitor), si no valor fijo pasado a wf-recorder -r
+                property string encoder: "software" // "software" | "nvenc" (vaapi descartado: crashea con el driver NVIDIA de este stack)
+                property string x264Preset: "veryfast" // ultrafast|superfast|veryfast|faster|fast|medium (libx264 -p preset=)
+                property string audioSource: "" // nombre pipewire/pactl; vacío = auto-detectar el monitor del sink por defecto
+                property bool showIndicator: true // indicador flotante siempre-encima mientras graba
+                // Lienzo de composición. 0 = auto (resolución del monitor activo al grabar).
+                property int canvasWidth: 0
+                property int canvasHeight: 0
+                /**
+                 * Escenas tipo OBS. Cada escena:
+                 *   { id, name, sources: [...], audio: [...] }
+                 *
+                 * Fuente (se compone sobre el lienzo, en orden `z`):
+                 *   type: "screen" | "window" | "webcam" | "image"
+                 *   monitor  (screen, vacío = el monitor activo al grabar)
+                 *   address/appClass/appTitle (window; el address se re-resuelve por clase+título al grabar)
+                 *   device   (webcam, ej. /dev/video0)
+                 *   path     (image)
+                 *   x, y, width, height: fracciones 0-1 del lienzo (independientes de la resolución)
+                 *   z, visible, opacity
+                 *
+                 * Audio (se mezclan con amix, por escena):
+                 *   type: "system" | "mic" | "app"
+                 *   id: nombre de fuente pactl (system/mic) o node.name de la app (app)
+                 *   name: etiqueta para la UI
+                 *   volume (0-2), muted
+                 */
+                property list<var> scenes: [{
+                    "id": "screen",
+                    "name": "Solo pantalla",
+                    "sources": [{ "type": "screen", "monitor": "", "x": 0, "y": 0, "width": 1, "height": 1, "z": 0, "visible": true, "opacity": 1 }],
+                    "audio": [{ "type": "system", "id": "", "name": "Audio del sistema", "volume": 1, "muted": false }]
+                }]
+                property string activeSceneId: "screen"
             }
 
             property JsonObject screenSnip: JsonObject {

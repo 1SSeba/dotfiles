@@ -34,13 +34,9 @@ RippleButton {
     toggled: (isToday == 1)
     buttonRadius: Appearance.rounding.small
 
-    // Un día con eventos se abre en el calendario web de un click. Sin eventos
-    // el botón queda inerte, igual que antes: no hay nada que mostrar.
-    onClicked: {
-        if (button.eventCount > 0 && button.dateKey.length > 0)
-            Calendars.openDay(button.dateKey);
-    }
-    
+    // El click lo maneja CalendarWidget: abre la vista de ese día, tenga
+    // eventos o no (un día vacío también es algo que querés poder ver).
+
     contentItem: Item {
         anchors.fill: parent
 
@@ -96,6 +92,6 @@ RippleButton {
                 ? Translation.tr("Todo el día")
                 : ev.start.toLocaleTimeString(Qt.locale(), "HH:mm");
             return `${hora}  ${ev.summary}`;
-        }).join("\n") + "\n\n" + Translation.tr("Click para abrirlo en el navegador")
+        }).join("\n") + "\n\n" + Translation.tr("Click para ver el día")
     }
 }

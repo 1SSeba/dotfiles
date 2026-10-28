@@ -29,6 +29,25 @@ ToolTip {
     // interceptar nada, así que no cierra por su cuenta.
     closePolicy: Popup.NoAutoClose
 
+    // ...y no cerrarse no alcanzaba. Un Popup no es un dibujo flotante: Qt le
+    // arma un `popupItem` que es un Item de verdad en la escena de la ventana,
+    // creado con `setAcceptedMouseButtons(Qt::AllButtons)` y su propio cursor.
+    // O sea: TODO el rectángulo del globito (fácil 300x30 px, centrado sobre un
+    // botón de 28) se traga los clics y el hover de lo que haya debajo.
+    //
+    // Y ese rectángulo casi nunca cae en un lugar vacío. La posición por
+    // omisión es "centrado y arriba del padre", pero si no entra arriba Qt lo
+    // VOLTEA abajo (comprobado: un botón en y=20 termina con el globito en
+    // y=51, tapando lo que sigue). En una lista como la del historial, donde
+    // cada fila tiene tres botoncitos con tooltip, el globito de uno queda
+    // encima de los botones de la fila de al lado y esos dejan de responder.
+    //
+    // Es el mismo mecanismo que ya mató los botones de historial/+/settings de
+    // AiTabBar dos veces; ahí se resolvió borrando esos tooltips. Acá se ataca
+    // la causa: un Item deshabilitado queda FUERA del reparto de eventos de Qt
+    // pero se sigue dibujando igual, así que el globito pasa a ser lo que
+    // siempre debió ser — pintura, no una superficie clickeable.
+    enabled: false
 
     visible: internalVisibleCondition
     

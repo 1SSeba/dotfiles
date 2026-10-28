@@ -467,13 +467,18 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
         Item {
             // Messages
+            id: messagesArea
             Layout.fillWidth: true
             Layout.fillHeight: true
             layer.enabled: true
             layer.effect: OpacityMask {
+                // Las medidas salen de ESTE item, no de `swipeView`: ese id vive
+                // en SidebarLeftContent.qml y desde acá no se resuelve (los id no
+                // cruzan de archivo), así que la máscara se armaba con
+                // width/height indefinidos.
                 maskSource: Rectangle {
-                    width: swipeView.width
-                    height: swipeView.height
+                    width: messagesArea.width
+                    height: messagesArea.height
                     radius: Appearance.rounding.small
                 }
             }
@@ -1163,10 +1168,20 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         z: 9999
         sourceComponent: AiNewChatDialog {
             agents: root.agents
-            onCanceled: root.showNewChatDialog = false
+            // Qt.callLater, no asignación directa: este Loader.active=false
+            // destruye la propia jerarquía de MouseArea que todavía está
+            // ejecutando el onClicked/onReleased que llegó hasta acá (el
+            // botón de cancelar o el de elegir agente). Borrar el "agarre"
+            // (grab) del mouse en pleno manejo del evento que lo generó es
+            // el "problema de puntero" que ya se documentó en AiTabBar/Ctrl+H:
+            // la ventana se queda con el grab colgando y los clicks
+            // posteriores en historial/+/settings dejan de llegar. Con
+            // callLater, la destrucción pasa en la vuelta siguiente del loop
+            // de eventos, con el evento de mouse ya completamente resuelto.
+            onCanceled: Qt.callLater(() => root.showNewChatDialog = false)
             onAgentPicked: agentId => {
                 Ai.newSession(agentId);
-                root.showNewChatDialog = false;
+                Qt.callLater(() => root.showNewChatDialog = false);
             }
         }
     }
@@ -1180,7 +1195,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         visible: root.openPicker === "addModel"
         z: 9999
         sourceComponent: AiAddModelForm {
-            onClosed: root.openPicker = ""
+            // Mismo motivo que en el modal de arriba: diferir para no destruir
+            // el MouseArea que originó este mismo evento.
+            onClosed: Qt.callLater(() => root.openPicker = "")
         }
     }
 }

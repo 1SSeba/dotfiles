@@ -18,6 +18,9 @@ AbstractBackgroundWidget {
     property string imagePath: Config.options.background.widgets.customImage.path ?? ""
     property bool dropHover: false
     property real widgetSize: Config.options.background.widgets.customImage.size ?? 200
+    // Mientras se estira, el tamaño sigue al mouse sin animar (antes la animación
+    // lo dejaba siempre un paso atrás del cursor).
+    property bool resizing: false
 
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
@@ -69,9 +72,11 @@ AbstractBackgroundWidget {
         implicitHeight: root.widgetSize
 
         Behavior on implicitWidth {
+            enabled: !root.resizing
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
         Behavior on implicitHeight {
+            enabled: !root.resizing
             animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
         }
 
@@ -160,10 +165,14 @@ AbstractBackgroundWidget {
             resizeMode: "diagonal"
             z: 1
             onResized: (newValue) => {
-                root.widgetSize = Math.max(80, newValue)
+                root.resizing = true
+                // Es cuadrada: el borde derecho va a la grilla y el alto lo acompaña.
+                root.widgetSize = root.snapSizeToGrid(newValue, newValue, 80, 80, 2000, 2000).width
             }
             onResizeFinished: {
+                root.resizing = false
                 Config.options.background.widgets.customImage.size = root.widgetSize
+                root.flashEdges(root.widgetSize, root.widgetSize)
             }
         }
     }

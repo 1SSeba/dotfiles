@@ -1,6 +1,7 @@
 import qs.modules.common.widgets
 import qs.modules.common
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import qs.services
 
@@ -15,6 +16,7 @@ RowLayout {
 
     property string text: ""
     property string buttonIcon: ""
+    property string tooltip: ""
     // Alias directos contra el slider. Antes `from`/`to` eran propiedades propias
     // bindeadas a slider.from/slider.to mientras el slider se bindeaba de vuelta:
     // una binding loop que dejaba el rango indefinido si el sitio de uso no lo
@@ -24,8 +26,13 @@ RowLayout {
     property alias to: slider.to
     property alias stepSize: slider.stepSize
     property alias stopIndicatorValues: slider.stopIndicatorValues
+    property alias dividerValues: slider.dividerValues
     property alias tooltipContent: slider.tooltipContent
     property bool usePercentTooltip: true
+    // Cuando hay stepSize, hace que el handle salte de barrita en barrita al
+    // arrastrar en vez de moverse libre — así se puede "calzar" un valor
+    // manualmente sin tener que soltar justo en el pixel exacto.
+    property bool snapToStep: false
     property real textWidth: 120
     // Permite un slider sin etiqueta, para cuando el ícono ya dice todo.
     property bool showLabel: true
@@ -60,12 +67,30 @@ RowLayout {
             color: Appearance.colors.colOnSecondaryContainer
             opacity: root.enabled ? 1 : 0.4
         }
+        MaterialSymbol {
+            visible: root.tooltip && root.tooltip.length > 0
+            text: "info"
+            iconSize: Appearance.font.pixelSize.large
+            color: Appearance.colors.colSubtext
+            MouseArea {
+                id: sliderInfoMouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.WhatsThisCursor
+                StyledToolTip {
+                    extraVisibleCondition: false
+                    alternativeVisibleCondition: sliderInfoMouseArea.containsMouse
+                    text: root.tooltip
+                }
+            }
+        }
     }
 
     StyledSlider {
         id: slider
         configuration: StyledSlider.Configuration.XS
         usePercentTooltip: root.usePercentTooltip
+        snapMode: root.snapToStep ? Slider.SnapAlways : Slider.NoSnap
         opacity: root.enabled ? 1 : 0.4
         // Piso para que una etiqueta larga no se coma el track entero.
         Layout.minimumWidth: 160

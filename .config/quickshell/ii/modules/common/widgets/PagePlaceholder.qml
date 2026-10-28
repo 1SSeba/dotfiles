@@ -27,6 +27,8 @@ Item {
 
     ColumnLayout {
         anchors.centerIn: parent
+        // Sin tope la descripción nunca envuelve y se sale en paneles angostos
+        width: Math.min(implicitWidth, root.width - 20)
         spacing: 5
 
         MaterialShapeWrappedMaterialSymbol {
