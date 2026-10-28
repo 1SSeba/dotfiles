@@ -31,6 +31,11 @@ for f in .zshrc .bashrc .bash_profile; do
   [ -f "$SRC/$f" ] && cp -a "$SRC/$f" "$HOME/$f"
 done
 
+# Rutas absolutas de la máquina de origen -> el $HOME de esta
+for f in .config/fish/fish_variables .config/hypr/hyprlock/colors.conf .config/illogical-impulse/config.json; do
+  [ -f "$HOME/$f" ] && sed -i "s|/home/scruzd|$HOME|g" "$HOME/$f"
+done
+
 # ------------------------------------------------------------------ 3. shim
 # La shell se lanza con LD_PRELOAD de este shim (habilita WebEngineView dentro
 # de quickshell). Sin él, hyprland/execs.conf apunta a una .so inexistente.

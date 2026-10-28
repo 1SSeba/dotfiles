@@ -186,6 +186,8 @@ PKGS_REPO=(
   qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
   # widgets
   fuzzel glib2 imagemagick songrec translate-shell wlogout libqalculate
+  # herramientas que usan scripts y keybinds (python3, ffmpeg, notify-send, grim...)
+  python ffmpeg libnotify grim inotify-tools yt-dlp xdg-utils easyeffects
   # audio
   cava pavucontrol-qt wireplumber pipewire-pulse libdbusmenu-gtk3 playerctl
   # brillo y sensores
@@ -216,7 +218,7 @@ sec2_repos() {
 PKGS_AUR=(
   adw-gtk-theme-git breeze-plus darkly-bin qt6-avif-image-plugin
   otf-space-grotesk ttf-material-symbols-variable-git ttf-readex-pro
-  ttf-rubik-vf ttf-twemoji
+  ttf-rubik-vf ttf-twemoji mpvpaper
 )
 sec3_aur() {
   b "3 · Dependencias del AUR (${#PKGS_AUR[@]})"

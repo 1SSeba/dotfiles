@@ -3,7 +3,7 @@
 set -euo pipefail
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXC=(--exclude='*.bak.*' --exclude='*.bak' --exclude='*.bak[0-9]*' --exclude='*.bak-*'
-     --exclude='*.tar.gz' --exclude='ii-backups' --exclude='.git' --exclude='__pycache__'
+     --exclude='*.tar.gz' --exclude='ii-backups' --exclude='.git' --exclude='.claude' --exclude='__pycache__'
      --exclude='*.log' --exclude='config.json.antes-widgets' --exclude='gtk-3.0/bookmarks')
 cd "$HOME/.config"
 for d in hypr quickshell/ii illogical-impulse fish kitty foot fuzzel matugen wlogout \
