@@ -15,7 +15,7 @@ qt6-base qt6-declarative qt6-svg qt6-5compat qt6-imageformats qt6-multimedia
 qt6-positioning qt6-quicktimeline qt6-sensors qt6-tools qt6-translations
 qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
 ## widgets
-fuzzel glib2 imagemagick songrec translate-shell wlogout libqalculate
+fuzzel glib2 imagemagick songrec translate-shell libqalculate
 ## herramientas que usan scripts y keybinds
 python ffmpeg libnotify grim inotify-tools yt-dlp xdg-utils easyeffects
 ## audio
@@ -41,7 +41,7 @@ clang uv gtk4 libadwaita libsoup3 libportal-gtk4 gobject-introspection
 # ============================================================================
 adw-gtk-theme-git breeze-plus darkly-bin qt6-avif-image-plugin
 otf-space-grotesk ttf-material-symbols-variable-git ttf-readex-pro
-ttf-rubik-vf ttf-twemoji mpvpaper
+ttf-rubik-vf ttf-twemoji mpvpaper wlogout
 
 # ============================================================================
 #  SECCIÓN 4 — metapaquetes, en orden de compilación (quickshell al final:
